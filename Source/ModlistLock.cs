@@ -4,7 +4,7 @@ namespace MMM;
 
 public class ModlistLockEntry
 {
-    [JsonPropertyName("id")] public required string Id { get; set; }
+    [JsonPropertyName("id")] public required string Id { get; init; }
     [JsonPropertyName("downloadUrl")] public required string DownloadUrl { get; set; }
     [JsonPropertyName("fileName")] public required string FileName { get; set; }
     [JsonPropertyName("hash")] public required string Hash { get; set; }

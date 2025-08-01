@@ -4,6 +4,12 @@ public static class Program
 {
     public static void Main(string[] args)
     {
+        if (!File.Exists(Settings.ModlistPath))
+        {
+            Log.Error($"No package.json found");
+            return;
+        }
+
         if (args.Length == 0)
         {
             return;

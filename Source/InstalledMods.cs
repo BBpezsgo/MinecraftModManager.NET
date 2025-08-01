@@ -7,7 +7,7 @@ namespace MMM;
 
 public static class InstalledMods
 {
-    static async Task ReadMod(ZipArchive archive, string filename, ImmutableArray<InstalledMod>.Builder result, CancellationToken ct)
+    public static async Task<FabricMod> ReadMod(ZipArchive archive, string filename, CancellationToken ct)
     {
         string text;
 
@@ -18,16 +18,26 @@ public static class InstalledMods
             text = reader.ReadToEnd();
         }
 
-        FabricMod content;
         try
         {
-            content = JsonSerializer.Deserialize<FabricMod>(Utils.SanitizeJson(text), FabricModJsonSerializerContext.Default.FabricMod)!;
-            result.Add(new InstalledMod(filename, content));
+            return JsonSerializer.Deserialize<FabricMod>(Utils.SanitizeJson(text), FabricModJsonSerializerContext.Default.FabricMod)!;
         }
         catch (JsonException e)
         {
             throw new ModLoadException($"Invalid JSON in mod", e);
         }
+    }
+
+    public static async Task<FabricMod> ReadMod(string file, CancellationToken ct)
+    {
+        using ZipArchive archive = await ZipFile.OpenReadAsync(file, ct);
+        return await ReadMod(archive, file, ct);
+    }
+
+    static async Task ReadMod(ZipArchive archive, string filename, ImmutableArray<InstalledMod>.Builder result, CancellationToken ct)
+    {
+        FabricMod content = await ReadMod(archive, filename, ct);
+        result.Add(new InstalledMod(filename, content));
 
         if (content.Jars is not null)
         {
@@ -38,8 +48,7 @@ public static class InstalledMods
 
                 if (entry is null)
                 {
-                    Log.Warning($"Nested JAR {subFilename} not found");
-                    continue;
+                    throw new ModLoadException($"Nested JAR {subFilename} not found");
                 }
 
                 using Stream substream = await entry.OpenAsync(ct);

@@ -97,7 +97,7 @@ public enum VersionOperator
 public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
 {
     public readonly VersionOperator Operator;
-    public readonly SemanticVersion? Version;
+    public readonly PartialSemanticVersion? Version;
     public readonly string Raw;
 
     public SingleVersionRange(string value)
@@ -107,37 +107,37 @@ public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
         if (value.StartsWith('='))
         {
             Operator = VersionOperator.Equal;
-            Raw = value[1..];
+            Raw = value = value[1..];
         }
         else if (value.StartsWith(">="))
         {
             Operator = VersionOperator.GreaterEqual;
-            Raw = value[2..];
+            Raw = value = value[2..];
         }
         else if (value.StartsWith("<="))
         {
             Operator = VersionOperator.LessEqual;
-            Raw = value[2..];
+            Raw = value = value[2..];
         }
         else if (value.StartsWith('>'))
         {
             Operator = VersionOperator.Greater;
-            Raw = value[1..];
+            Raw = value = value[1..];
         }
         else if (value.StartsWith('<'))
         {
             Operator = VersionOperator.Less;
-            Raw = value[1..];
+            Raw = value = value[1..];
         }
         else if (value.StartsWith('^'))
         {
             Operator = VersionOperator.UptoMajor;
-            Raw = value[1..];
+            Raw = value = value[1..];
         }
         else if (value.StartsWith('~'))
         {
             Operator = VersionOperator.UptoMinor;
-            Raw = value[1..];
+            Raw = value = value[1..];
         }
         else
         {
@@ -145,7 +145,7 @@ public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
             Raw = value;
         }
 
-        Version = SemanticVersion.TryParse(Raw, out SemanticVersion v) ? v : null;
+        Version = PartialSemanticVersion.TryParse(value, out var v) ? v : null;
     }
 
     public override string ToString() => Raw == "*" ? Raw : $"{Operator switch
@@ -181,11 +181,11 @@ public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
                 return version < Version.Value;
             case VersionOperator.UptoMajor:
                 if (version >= Version.Value) return true;
-                if (version < new SemanticVersion(Version.Value.Major + 1, 0, 0)) return true;
+                if (version < new PartialSemanticVersion(Version.Value.Major.HasValue ? (Version.Value.Major.Value + 1) : null, 0, 0)) return true;
                 return true;
             case VersionOperator.UptoMinor:
                 if (version >= Version.Value) return true;
-                if (version < new SemanticVersion(Version.Value.Major, Version.Value.Minor + 1, 0)) return true;
+                if (version < new PartialSemanticVersion(Version.Value.Major, Version.Value.Minor.HasValue ? (Version.Value.Minor.Value + 1) : null, 0)) return true;
                 return true;
             default:
                 throw new UnreachableException();

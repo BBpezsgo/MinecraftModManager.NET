@@ -20,7 +20,7 @@ public static class Lockfile
 {
     public static async Task<ImmutableArray<LockfileError>> GetLockfileErrors(string modsDirectory, IEnumerable<ModlistLockEntry> modlistLock, CancellationToken ct)
     {
-        List<InstalledMod> installedMods = [];
+        List<InstalledComponent> installedMods = [];
         var errors = ImmutableArray.CreateBuilder<LockfileError>();
 
         foreach (string file in Directory.GetFiles(modsDirectory, "*.jar"))

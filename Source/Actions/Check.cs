@@ -28,7 +28,7 @@ public static class Check
         }
 
         Log.MajorAction($"Checking dependencies");
-        var (errors, ok) = await DependencyResolution.CheckDependencies(settings, true, ct);
+        var (errors, ok) = await DependencyResolution.CheckDependencies(settings, false, ct);
 
         ModrinthClient client = new(Settings.ModrinthClientConfig);
 
@@ -52,7 +52,7 @@ public static class Check
 
                 Log.Notice($"Mod {error.OtherId} found online as {result.Title} by {result.Author}");
 
-                if (!Log.AskYesNo($"Is this the correct mod? [y/n]"))
+                if (!Log.AskYesNo($"Is this the correct mod?"))
                 {
                     continue;
                 }

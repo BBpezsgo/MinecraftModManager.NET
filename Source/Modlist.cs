@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 
 namespace MMM;
@@ -12,9 +13,9 @@ public class ModlistEntry
 
 public class Modlist
 {
-    [JsonPropertyName("loader")] public required string Loader { get; set; }
-    [JsonPropertyName("gameVersion")] public required string GameVersion { get; set; }
-    [JsonPropertyName("defaultAllowedReleaseTypes")] public required List<string> DefaultAllowedReleaseTypes { get; set; }
-    [JsonPropertyName("modsFolder")] public required string ModsFolder { get; set; }
-    [JsonPropertyName("mods")] public required List<ModlistEntry> Mods { get; set; }
+    [JsonPropertyName("loader")] public required string Loader { get; init; }
+    [JsonPropertyName("gameVersion")] public required string GameVersion { get; init; }
+    [JsonPropertyName("defaultAllowedReleaseTypes")] public required ImmutableArray<string> DefaultAllowedReleaseTypes { get; init; }
+    [JsonPropertyName("modsFolder")] public required string ModsFolder { get; init; }
+    [JsonPropertyName("mods")] public required List<ModlistEntry> Mods { get; init; }
 }

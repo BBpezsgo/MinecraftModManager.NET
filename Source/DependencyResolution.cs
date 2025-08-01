@@ -17,7 +17,7 @@ public readonly struct DependencyError
     public required DependencyErrorLevel Level { get; init; }
     public required InstalledMod Subject { get; init; }
     public required string OtherId { get; init; }
-    public required InstalledMod? OtherInstalled { get; init; }
+    public required InstalledComponent? OtherInstalled { get; init; }
 }
 
 public static class DependencyResolution
@@ -29,17 +29,20 @@ public static class DependencyResolution
         NotFound,
     }
 
-    static (InstalledMod? Mod, DependencyStatus Status) FindBestMatch(string id, VersionRange version, ImmutableArray<InstalledMod> mods)
+    static (InstalledComponent? Mod, DependencyStatus Status) FindBestMatch(string id, VersionRange version, ImmutableArray<InstalledComponent> mods)
     {
-        InstalledMod? best = null;
+        InstalledComponent? best = null;
 
-        foreach (InstalledMod installedMod in mods)
+        foreach (InstalledComponent installedMod in mods)
         {
             var mod = installedMod.Mod;
 
-            if (mod.Id != id && (mod.Provides.IsDefaultOrEmpty || !mod.Provides.Contains(id)))
+            if (mod.Id != id)
             {
-                continue;
+                if (mod is not FabricMod fabricMod || fabricMod.Provides.IsDefaultOrEmpty || !fabricMod.Provides.Contains(id))
+                {
+                    continue;
+                }
             }
 
             if (version.Satisfies(mod.Version))
@@ -62,13 +65,20 @@ public static class DependencyResolution
 
     static bool ShouldSkip(string dependency) =>
         dependency == "fabricloader" ||
-        dependency == "minecraft" ||
         dependency == "java" ||
         dependency == "another-mod";
 
     public static async Task<(ImmutableArray<DependencyError> Errors, bool Ok)> CheckDependencies(Settings settings, bool printErrorsOnly, CancellationToken ct)
     {
         ImmutableArray<InstalledMod> mods = await settings.ReadMods(ct);
+        ImmutableArray<InstalledComponent> components = [
+            .. mods.Select(v => new InstalledComponent(v.FileName, v.Mod)),
+            new InstalledComponent(null, new GenericComponent(){
+                Name = "Minecraft",
+                Id = "minecraft",
+                Version = settings.Modlist.GameVersion,
+            }),
+        ];
 
         ImmutableArray<DependencyError>.Builder errors = ImmutableArray.CreateBuilder<DependencyError>();
         bool ok = true;
@@ -79,12 +89,14 @@ public static class DependencyResolution
             ModlistLockEntry? lockEntry = settings.ModlistLock.FirstOrDefault(v => v.FileName == Path.GetFileName(installedMod.FileName));
             ModlistEntry? modEntry = lockEntry is null ? null : settings.Modlist.Mods.FirstOrDefault(v => v.Id == lockEntry.Id);
 
+            if (lockEntry is null) continue;
+
             if (mod.Depends is not null)
             {
                 foreach (var dep in mod.Depends)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, mods);
+                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {
@@ -116,7 +128,7 @@ public static class DependencyResolution
                 foreach (var dep in mod.Recommends)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, mods);
+                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {
@@ -137,7 +149,7 @@ public static class DependencyResolution
                 foreach (var dep in mod.Suggests)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, mods);
+                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {
@@ -158,7 +170,7 @@ public static class DependencyResolution
                 foreach (var dep in mod.Conflicts)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, mods);
+                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {
@@ -178,7 +190,7 @@ public static class DependencyResolution
                 foreach (var dep in mod.Breaks)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, mods);
+                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {

@@ -7,7 +7,13 @@ namespace MMM;
 
 public class Settings
 {
-    public static readonly string MinecraftPath = "/home/BB/.minecraft";
+    public static readonly string MinecraftPath =
+#if DEBUG
+    $"{Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}/.minecraft/";
+#else
+    Environment.CurrentDirectory;
+#endif
+
     public static readonly string ModlistPath = Path.Combine(MinecraftPath, "modlist.json");
     public static readonly string ModlistLockPath = Path.Combine(MinecraftPath, "modlist-lock.json");
 
@@ -30,17 +36,13 @@ public class Settings
 
     public static Settings Create()
     {
-        string minecraftPath = "/home/BB/.minecraft";
-        string modlistPath = Path.Combine(minecraftPath, "modlist.json");
-        string modlistLockPath = Path.Combine(minecraftPath, "modlist-lock.json");
-
         List<ModlistLockEntry> modlistLock = [];
-        if (File.Exists(modlistLockPath))
+        if (File.Exists(ModlistLockPath))
         {
-            modlistLock = JsonSerializer.Deserialize<List<ModlistLockEntry>>(File.ReadAllText(modlistLockPath)) ?? throw new JsonException();
+            modlistLock = JsonSerializer.Deserialize<List<ModlistLockEntry>>(File.ReadAllText(ModlistLockPath)) ?? throw new JsonException();
         }
 
-        Modlist modlist = JsonSerializer.Deserialize<Modlist>(File.ReadAllText(modlistPath)) ?? throw new JsonException();
+        Modlist modlist = JsonSerializer.Deserialize<Modlist>(File.ReadAllText(ModlistPath)) ?? throw new JsonException();
 
         return new Settings
         {
@@ -49,5 +51,7 @@ public class Settings
         };
     }
 }
+
+public record struct InstalledComponent(string? FileName, GenericComponent Mod);
 
 public record struct InstalledMod(string FileName, FabricMod Mod);

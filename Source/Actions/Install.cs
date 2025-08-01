@@ -74,8 +74,7 @@ public static class Install
     {
         if (info.LockEntry is not null)
         {
-            int j = modlistLock.IndexOf(v => v.Id == info.LockEntry.Id);
-            modlistLock.RemoveAt(j);
+            modlistLock.Remove(info.LockEntry);
         }
 
         if (info.File is not null)
@@ -413,7 +412,7 @@ public static class Install
         }
         else
         {
-            if (Log.AskYesNo("Do you want to perform the actions above? [y/n]"))
+            if (Log.AskYesNo("Do you want to perform the actions above?", true))
             {
                 await File.WriteAllTextAsync(Settings.ModlistPath, JsonSerializer.Serialize(settings.Modlist, Utils.JsonSerializerOptions), ct);
 
