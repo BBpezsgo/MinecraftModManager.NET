@@ -18,43 +18,60 @@ public readonly struct LockfileError
 
 public static class Lockfile
 {
-    public static async Task<ImmutableArray<LockfileError>> GetLockfileErrors(string modsDirectory, IEnumerable<ModlistLockEntry> modlistLock, CancellationToken ct)
+    public static async Task<ImmutableArray<LockfileError>> GetLockfileErrors(string modsDirectory, IReadOnlyList<ModlistLockEntry> modlistLock, bool print, CancellationToken ct)
     {
         List<InstalledComponent> installedMods = [];
         var errors = ImmutableArray.CreateBuilder<LockfileError>();
 
-        foreach (string file in Directory.GetFiles(modsDirectory, "*.jar"))
+        ProgressBar progressBar = new();
+
+        if (Directory.Exists(modsDirectory))
         {
-            string hash = await Utils.ComputeHash1(file, ct);
-
-            var lockEntry = modlistLock.FirstOrDefault(v => v.FileName == Path.GetFileName(file));
-
-            if (lockEntry is null)
+            string[] array = Directory.GetFiles(modsDirectory, "*.jar");
+            for (int i = 0; i < array.Length; i++)
             {
-                errors.Add(new LockfileError()
-                {
-                    Status = LockfileStatus.NotTracked,
-                    File = file,
-                    Entry = null,
-                });
-                continue;
-            }
+                string file = array[i];
 
-            if (hash != lockEntry.Hash)
-            {
-                errors.Add(new LockfileError()
+                progressBar.Report(Path.GetFileName(file), i, array.Length);
+
+                string hash = await Utils.ComputeHash1(file, ct);
+
+                var lockEntry = modlistLock.FirstOrDefault(v => v.FileName == Path.GetFileName(file));
+
+                if (lockEntry is null)
                 {
-                    Status = LockfileStatus.ChecksumMismatch,
-                    File = file,
-                    Entry = lockEntry,
-                });
-                continue;
+                    errors.Add(new LockfileError()
+                    {
+                        Status = LockfileStatus.NotTracked,
+                        File = file,
+                        Entry = null,
+                    });
+                    if (print) Log.Error($"File {Path.GetFileName(file)} does not exists in the lockfile");
+                    continue;
+                }
+
+                if (hash != lockEntry.Hash)
+                {
+                    errors.Add(new LockfileError()
+                    {
+                        Status = LockfileStatus.ChecksumMismatch,
+                        File = file,
+                        Entry = lockEntry,
+                    });
+                    if (print) Log.Error($"File {Path.GetFileName(file)} checksum mismatched");
+                    continue;
+                }
             }
         }
 
-        foreach (var lockEntry in modlistLock)
+        for (int i = 0; i < modlistLock.Count; i++)
         {
+            ModlistLockEntry lockEntry = modlistLock[i];
+
+            progressBar.Report(lockEntry.Name ?? lockEntry.Id, i, modlistLock.Count);
+
             string file = Path.GetFullPath(Path.Combine(modsDirectory, lockEntry.FileName));
+
             if (!File.Exists(file))
             {
                 errors.Add(new LockfileError()
@@ -63,11 +80,13 @@ public static class Lockfile
                     File = file,
                     Entry = lockEntry,
                 });
+                if (print) Log.Error($"File {file} does not exists");
                 continue;
             }
         }
 
+        progressBar.Dispose();
+
         return errors.ToImmutable();
     }
-
 }

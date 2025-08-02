@@ -9,9 +9,10 @@ Convinient command line mod manager for Minecraft using Modrinth.
 
 ## Features
 
-- Dependency & conflict check (and automatic dependency installation)
-- Add & remove mods
+- Install & uninstall mods
 - Update installed mods
+- Dependency management
+- Conflict check
 
 ## Usage
 
@@ -27,9 +28,7 @@ Convinient command line mod manager for Minecraft using Modrinth.
 
 ## TODO
 
-- Check for dependencies and conflicts when adding/removing/updating a mod.
-- Download all the dependencies and remove orphans automatically.
-  - Use the dependencies Modrinth gives first when trying to resolve them.
+- Check for dependencies and conflicts when adding/removing/updating a mod. (WIP)
 - Easier Minecraft version change & check. (you can remove the mods folder and the lock file and set the Minecraft version)
 - Use the automatic mod search in more places.
 

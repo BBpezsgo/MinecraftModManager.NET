@@ -5,8 +5,14 @@ static partial class Log
 {
     public static bool AskYesNo(string question, bool? defaultValue = null)
     {
+        Console.WriteLine();
+
         do
         {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.Write(":: ");
+            Console.ForegroundColor = ConsoleColor.White;
+
             Console.Write(question);
 
             Console.Write(" [");

@@ -4,110 +4,104 @@ namespace MMM;
 
 public class ProgressBar : IDisposable, IProgress<float>
 {
-    const int blockCount = 10;
-    static readonly TimeSpan animationInterval = TimeSpan.FromSeconds(1.0 / 8);
-    const string animation = @"|/-\";
+    static readonly TimeSpan AnimationInterval = TimeSpan.FromSeconds(1.0 / 8);
+    const string Animation = @"|/-\";
 
-    readonly Timer timer;
+    readonly Timer Timer;
 
-    float currentProgress = 0;
-    string currentText = string.Empty;
-    bool disposed = false;
-    int animationIndex = 0;
+    float Progress = 0;
+    string Title = string.Empty;
+
+    bool IsDisposed = false;
+    LogEntry LastLine = default;
 
     public ProgressBar()
     {
-        timer = new Timer(TimerHandler);
+        Timer = new Timer(TimerHandler);
         if (Console.IsOutputRedirected) return;
+
+        Log.Keep(LastLine);
+
         ResetTimer();
     }
 
     public void Report(float value)
     {
         value = Math.Clamp(value, 0f, 1f);
-        Interlocked.Exchange(ref currentProgress, value);
+        Interlocked.Exchange(ref Progress, value);
     }
 
     public void Report(int index, int length) => Report((float)index / (float)length);
 
+    public void Report(string title, float value)
+    {
+        Interlocked.Exchange(ref Title, title);
+        Report(value);
+    }
+
+    public void Report(string title, int index, int length) => Report(title, (float)index / (float)length);
+
     void TimerHandler(object? state)
     {
-        lock (timer)
+        lock (Timer)
         {
-            if (disposed) return;
+            if (IsDisposed) return;
 
-            int progressBlockCount = (int)(currentProgress * blockCount);
-            string text = string.Format("[{0}{1}] {2}",
-                new string('#', progressBlockCount), new string('-', blockCount - progressBlockCount),
-                animation[animationIndex++ % animation.Length]);
-            UpdateText(text);
+            string title = Title;
+
+            if (title.Length >= Console.WindowWidth / 2)
+            {
+                title = title[..(Console.WindowWidth / 2 - 3)] + "...";
+            }
+
+            LastLine.Back();
+            LastLine = default;
+
+            LastLine += Log.Write(title);
+            LastLine += Log.Write(new string(' ', Math.Max(0, Console.WindowWidth / 2 - title.Length)));
+            int w = Console.WindowWidth - Console.CursorLeft - 2;
+            if (w >= 2)
+            {
+                int fill = (int)(w * Progress);
+                int empty = w - fill;
+
+                StringBuilder b = new();
+                b.Append('[');
+                b.Append('#', fill);
+                b.Append(' ', empty);
+                b.Append(']');
+
+                LastLine += Log.Write(b.ToString());
+            }
+
+            Log.Rekeep(LastLine);
 
             ResetTimer();
         }
     }
 
-    void UpdateText(string text)
-    {
-        // Get length of common portion
-        int commonPrefixLength = 0;
-        int commonLength = Math.Min(currentText.Length, text.Length);
-        while (commonPrefixLength < commonLength && text[commonPrefixLength] == currentText[commonPrefixLength])
-        {
-            commonPrefixLength++;
-        }
-
-        // Backtrack to the first differing character
-        StringBuilder outputBuilder = new();
-        outputBuilder.Append('\b', currentText.Length - commonPrefixLength);
-
-        // Output new suffix
-        outputBuilder.Append(text[commonPrefixLength..]);
-
-        // If the new text is shorter than the old one: delete overlapping characters
-        int overlapCount = currentText.Length - text.Length;
-        if (overlapCount > 0)
-        {
-            outputBuilder.Append(' ', overlapCount);
-            outputBuilder.Append('\b', overlapCount);
-        }
-
-        Console.Write(outputBuilder);
-        currentText = text;
-    }
-
     void ResetTimer()
     {
-        timer.Change(animationInterval, TimeSpan.FromMilliseconds(-1));
+        Timer.Change(AnimationInterval, TimeSpan.FromMilliseconds(-1));
     }
 
     public void Dispose()
     {
-        lock (timer)
-        {
-            disposed = true;
-            UpdateText(string.Empty);
-        }
-    }
+        if (IsDisposed) return;
 
+        lock (Timer)
+        {
+            IsDisposed = true;
+            LastLine.Clear();
+            Log.Unkeep();
+        }
+
+        IsDisposed = true;
+        GC.SuppressFinalize(this);
+    }
 }
 
 static partial class Log
 {
-    public static LogEntry Progress(int index, int length) => Progress((float)index / (float)length);
-    public static LogEntry Progress(float progress)
-    {
-        int w = Console.WindowWidth - Console.CursorLeft - 2;
-        if (w < 2) return default;
-
-        int fill = (int)(w * progress);
-        int empty = w - fill;
-
-        StringBuilder b = new();
-        b.Append('[');
-        b.Append('#', fill);
-        b.Append(' ', empty);
-        b.Append(']');
-
-        return Write(b.ToString());
-    }
+    
 }

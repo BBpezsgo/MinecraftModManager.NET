@@ -50,6 +50,47 @@ public class Settings
             ModlistLock = modlistLock,
         };
     }
+
+    public string? GetModName(string? id) =>
+        id is null ? null : (
+            ModlistLock.FirstOrDefault(v => v.Id == id)?.Name
+            ?? Modlist.Mods.FirstOrDefault(v => v.Id == id)?.Name
+        );
+
+    public async Task<string?> GetModId(string name, CancellationToken ct)
+    {
+        string? result = ModlistLock.FirstOrDefault(v => v.Id == name || string.Equals(v.Name, name, StringComparison.InvariantCultureIgnoreCase))?.Id;
+        if (result is not null) return result;
+
+        result = Modlist.Mods.FirstOrDefault(v => v.Id == name || string.Equals(v.Name, name, StringComparison.InvariantCultureIgnoreCase))?.Id;
+        if (result is not null) return result;
+
+        var mods = await ReadMods(ct);
+        var filename = Path.GetFileName(mods.FirstOrDefault(v => string.Equals(v.Mod.Id, name, StringComparison.InvariantCultureIgnoreCase) || string.Equals(v.Mod.Name, name, StringComparison.InvariantCultureIgnoreCase)).FileName);
+        if (filename is not null)
+        {
+            return ModlistLock.FirstOrDefault(v => v.FileName == filename)?.Id;
+        }
+
+        return null;
+    }
+
+    public string? GetModId(string name, ImmutableArray<InstalledMod> mods)
+    {
+        string? result = ModlistLock.FirstOrDefault(v => v.Id == name || v.Name == name)?.Id;
+        if (result is not null) return result;
+
+        result = Modlist.Mods.FirstOrDefault(v => v.Id == name || v.Name == name)?.Id;
+        if (result is not null) return result;
+
+        var filename = Path.GetFileName(mods.FirstOrDefault(v => v.Mod.Id == name || v.Mod.Name == name).FileName);
+        if (filename is not null)
+        {
+            return ModlistLock.FirstOrDefault(v => v.FileName == filename)?.Id;
+        }
+
+        return null;
+    }
 }
 
 public record struct InstalledComponent(string? FileName, GenericComponent Mod);

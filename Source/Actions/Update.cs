@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Modrinth;
 
 namespace MMM.Actions;
@@ -11,24 +12,36 @@ public static class Update
 
         List<ModUpdate> modUpdates = [];
 
-        Log.MajorAction($"Checking for updates ...");
-        LogEntry lastLine = default;
-        Log.Keep(lastLine);
+        Log.Section($"Checking for updates");
+        ProgressBar progressBar = new();
 
-        for (int i = 0; i < settings.Modlist.Mods.Count; i++)
+        HashSet<string> checkTheseSet = [];
+
+        void AddThese(IEnumerable<string> mods)
         {
-            var mod = settings.Modlist.Mods[i];
+            foreach (string mod in mods)
+            {
+                if (!checkTheseSet.Add(mod)) continue;
+                List<string> dependencies = settings.ModlistLock.FirstOrDefault(v => v.Id == mod)?.Dependencies ?? [];
+                AddThese(dependencies);
+            }
+        }
 
-            lastLine.Back();
-            Log.Rekeep(lastLine =
-                Log.Write(mod.Name ?? mod.Id) +
-                Log.Write(new string(' ', Math.Max(0, Console.WindowWidth / 2 - (mod.Name ?? mod.Id).Length))) +
-                Log.Progress(i, settings.Modlist.Mods.Count));
+        AddThese(settings.Modlist.Mods.Select(v => v.Id));
+
+        ImmutableArray<string> checkThese = [.. checkTheseSet];
+
+        for (int i = 0; i < checkThese.Length; i++)
+        {
+            string modId = checkThese[i];
+            string modName = settings.GetModName(modId) ?? modId;
+
+            progressBar.Report(modName, i, checkThese.Length);
 
             ModUpdate? update;
             try
             {
-                update = await Install.FindModIfNeeded(mod.Id, settings, client, ct);
+                update = await Install.FindModIfNeeded(modId, settings, client, ct);
             }
             catch (Exception e)
             {
@@ -41,8 +54,7 @@ public static class Update
             modUpdates.Add(update);
         }
 
-        lastLine.Clear();
-        Log.Unkeep();
+        progressBar.Dispose();
 
         await Install.PerformChanges(settings, modUpdates, [], ct);
     }

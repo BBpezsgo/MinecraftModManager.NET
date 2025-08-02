@@ -27,24 +27,39 @@ public class ModUninstallInfo
 
 public static class Install
 {
-    public static async Task DownloadMod(ModDownloadInfo info, List<ModlistLockEntry> modlistLock, string modsDirectory, CancellationToken ct)
+    public static async Task DownloadMod(ModDownloadInfo info, Settings settings, CancellationToken ct)
     {
+        if (!Directory.Exists(settings.ModsDirectory))
+        {
+            Directory.CreateDirectory(settings.ModsDirectory);
+        }
+
+        string filepath = Path.GetFullPath(Path.Combine(settings.ModsDirectory, info.DownloadFileName));
+        //if (!File.Exists(filepath)) File.Create(filepath).Dispose();
         using var httpClient = new HttpClient();
         using var s = await httpClient.GetStreamAsync(info.File.Url, ct);
-        using var fs = new FileStream(Path.GetFullPath(Path.Combine(modsDirectory, info.DownloadFileName)), FileMode.Create);
+        using var fs = new FileStream(filepath, FileMode.Create);
         await s.CopyToAsync(fs, ct);
 
         string? oldFilename = null;
 
+        List<string> dependencies =
+            (info.Version.Dependencies ?? [])
+            .Where(v => v.DependencyType == Modrinth.Models.Enums.Version.DependencyType.Required)
+            .Select(v => v.ProjectId)
+            .Where(v => v is not null)
+            .ToList()!;
+
         if (info.LockEntry is null)
         {
-            modlistLock.Add(new ModlistLockEntry()
+            settings.ModlistLock.Add(new ModlistLockEntry()
             {
                 Id = info.Mod.Id,
                 Hash = info.File.Hashes.Sha1,
                 FileName = info.DownloadFileName,
                 ReleasedOn = info.Version.DatePublished.ToString("o"),
                 DownloadUrl = info.File.Url,
+                Dependencies = dependencies,
             });
         }
         else
@@ -58,11 +73,13 @@ public static class Install
             info.LockEntry.FileName = info.DownloadFileName;
             info.LockEntry.ReleasedOn = info.Version.DatePublished.ToString("o");
             info.LockEntry.DownloadUrl = info.File.Url;
+            info.LockEntry.Dependencies.Clear();
+            info.LockEntry.Dependencies.AddRange(dependencies);
         }
 
-        await File.WriteAllTextAsync(Settings.ModlistLockPath, JsonSerializer.Serialize(modlistLock, Utils.JsonSerializerOptions), ct);
+        await File.WriteAllTextAsync(Settings.ModlistLockPath, JsonSerializer.Serialize(settings.ModlistLock, Utils.JsonSerializerOptions), ct);
 
-        oldFilename = oldFilename is null ? null : Path.GetFullPath(Path.Combine(modsDirectory, oldFilename));
+        oldFilename = oldFilename is null ? null : Path.GetFullPath(Path.Combine(settings.ModsDirectory, oldFilename));
 
         if (oldFilename is not null && File.Exists(oldFilename))
         {
@@ -70,11 +87,11 @@ public static class Install
         }
     }
 
-    public static void UninstallMod(ModUninstallInfo info, List<ModlistLockEntry> modlistLock, string modsDirectory)
+    public static void UninstallMod(ModUninstallInfo info, Settings settings)
     {
         if (info.LockEntry is not null)
         {
-            modlistLock.Remove(info.LockEntry);
+            settings.ModlistLock.Remove(info.LockEntry);
         }
 
         if (info.File is not null)
@@ -186,66 +203,57 @@ public static class Install
             : null;
     }
 
+    static async Task<(bool NeedsDownload, ModUpdateReason Reason)> IsNeeded(ModlistEntry mod, Settings settings, CancellationToken ct)
+    {
+        ModlistLockEntry? lockfileEntry = settings.ModlistLock.FirstOrDefault(v => v.Id == mod.Id);
+        if (lockfileEntry is null)
+        {
+            return (true, ModUpdateReason.NotInstalled);
+        }
+
+        string filename = Path.GetFullPath(Path.Combine(settings.ModsDirectory, lockfileEntry.FileName));
+        if (!File.Exists(filename))
+        {
+            return (true, ModUpdateReason.NotInstalled);
+        }
+
+        string hash = await Utils.ComputeHash1(filename, ct);
+        if (hash != lockfileEntry.Hash)
+        {
+            return (true, ModUpdateReason.InvalidHash);
+        }
+
+        return (false, default);
+    }
+
     public static async Task<(List<ModUpdate> Updates, List<ModUninstall> Uninstalls)> CheckChanges(Settings settings, ModrinthClient client, CancellationToken ct)
     {
+        Log.Section($"Checking for changes");
+
         List<ModUpdate> modUpdates = [];
         List<ModUninstall> modUninstalls = [];
 
         {
-            Log.SubAction($"Checking for new mods ...");
+            Log.MinorAction($"Checking for new mods");
 
             List<(ModlistEntry Mod, ModUpdateReason Reason)> fetchThese = [];
 
             foreach (var mod in settings.Modlist.Mods)
             {
-                var lockfileEntry = settings.ModlistLock.FirstOrDefault(v => v.Id == mod.Id);
-
-                bool needsDownload = false;
-                ModUpdateReason reason = default;
-
-                if (lockfileEntry is null)
-                {
-                    needsDownload = true;
-                    reason = ModUpdateReason.NotInstalled;
-                }
-                else
-                {
-                    string filename = Path.GetFullPath(Path.Combine(settings.ModsDirectory, lockfileEntry.FileName));
-
-                    if (File.Exists(filename))
-                    {
-                        string hash = await Utils.ComputeHash1(filename, ct);
-                        if (hash != lockfileEntry.Hash)
-                        {
-                            needsDownload = true;
-                            reason = ModUpdateReason.InvalidHash;
-                        }
-                    }
-                    else
-                    {
-                        needsDownload = true;
-                        reason = ModUpdateReason.NotInstalled;
-                    }
-                }
-
-                if (needsDownload)
-                {
-                    fetchThese.Add((mod, reason));
-                }
+                var (needsDownload, reason) = await IsNeeded(mod, settings, ct);
+                if (!needsDownload) continue;
+                fetchThese.Add((mod, reason));
             }
 
-            LogEntry lastLine = default;
-            Log.Keep(lastLine);
+            Log.MinorAction($"Fetching mods");
+
+            ProgressBar progressBar = new();
 
             for (int i = 0; i < fetchThese.Count; i++)
             {
                 var mod = fetchThese[i];
 
-                lastLine.Back();
-                Log.Rekeep(lastLine =
-                    Log.Write(mod.Mod.Name ?? mod.Mod.Id) +
-                    Log.Write(new string(' ', Math.Max(0, Console.WindowWidth / 2 - (mod.Mod.Name ?? mod.Mod.Id).Length))) +
-                    Log.Progress(i, fetchThese.Count));
+                progressBar.Report(mod.Mod.Name ?? mod.Mod.Id, i, fetchThese.Count);
 
                 ModDownloadInfo? update;
 
@@ -270,16 +278,39 @@ public static class Install
                     LockEntry = update.LockEntry,
                     Version = update.Version,
                 });
+
+                foreach (var dependency in update.Version.Dependencies ?? [])
+                {
+                    if (dependency.ProjectId is null) continue;
+                    if (fetchThese.Any(v => v.Mod.Id == dependency.ProjectId)) continue;
+
+                    switch (dependency.DependencyType)
+                    {
+                        case Modrinth.Models.Enums.Version.DependencyType.Required:
+                            ModlistEntry entry = settings.Modlist.Mods.FirstOrDefault(v => v.Id == dependency.ProjectId) ?? new ModlistEntry()
+                            {
+                                Id = dependency.ProjectId,
+                            };
+                            var (needsDownload, reason) = await IsNeeded(entry, settings, ct);
+                            if (!needsDownload) break;
+                            fetchThese.Add((entry, reason));
+                            break;
+                        case Modrinth.Models.Enums.Version.DependencyType.Optional:
+                            break;
+                        case Modrinth.Models.Enums.Version.DependencyType.Incompatible:
+                            break;
+                        case Modrinth.Models.Enums.Version.DependencyType.Embedded:
+                            break;
+                    }
+                }
             }
 
-            lastLine.Clear();
-            Log.Unkeep();
+            progressBar.Dispose();
 
-            Log.SubAction($"Checking for orphan mods ...");
+            Log.MinorAction($"Checking for orphan mods");
 
-            for (int i = 0; i < settings.ModlistLock.Count; i++)
+            foreach (var modlock in settings.ModlistLock)
             {
-                var modlock = settings.ModlistLock[i];
                 var mod = settings.Modlist.Mods.FirstOrDefault(v => v.Id == modlock.Id);
 
                 if (mod is not null) continue;
@@ -299,23 +330,58 @@ public static class Install
                 });
             }
 
-            Log.SubAction($"Fetching missing mod metadata ...");
-
-            for (int i = 0; i < settings.Modlist.Mods.Count; i++)
+            void DontUninstall(ModlistLockEntry modlock)
             {
-                ModlistEntry mod = settings.Modlist.Mods[i];
-                if (mod.Name is not null) continue;
+                foreach (string dep in modlock.Dependencies)
+                {
+                    var dependencyLock = settings.ModlistLock.FirstOrDefault(v => v.Id == dep);
+                    if (dependencyLock is null) continue;
+                    var uninstall = modUninstalls.FirstOrDefault(v => v.LockEntry is not null && v.LockEntry.Id == dep);
+                    if (uninstall is not null) modUninstalls.Remove(uninstall);
+                    DontUninstall(dependencyLock);
+                }
+            }
+
+            foreach (var modlock in settings.ModlistLock)
+            {
+                if (modUninstalls.Any(v => v.LockEntry is not null && v.LockEntry.Id == modlock.Id)) continue;
+                DontUninstall(modlock);
+            }
+
+            Log.MinorAction($"Fetching missing mod metadata");
+
+            progressBar = new();
+
+            List<ModlistLockEntry> modsWithMissingMetadata = [
+                .. settings.ModlistLock,
+            ];
+
+            modsWithMissingMetadata.AddRange(modUpdates.Select(v => v.LockEntry).Where(v => v is not null && !modsWithMissingMetadata.Any(w => v.Id == w.Id))!);
+            modsWithMissingMetadata.AddRange(modUninstalls.Select(v => v.LockEntry).Where(v => v is not null && !modsWithMissingMetadata.Any(w => v.Id == w.Id))!);
+
+            modsWithMissingMetadata.RemoveAll(v => v.Name is not null);
+
+            for (int i = 0; i < modsWithMissingMetadata.Count; i++)
+            {
+                ModlistLockEntry mod = modsWithMissingMetadata[i];
+
+                progressBar.Report(mod.Name ?? mod.Id, i, modsWithMissingMetadata.Count);
 
                 try
                 {
                     Modrinth.Models.Project project = await client.Project.GetAsync(mod.Id, ct);
-                    mod.Name = project.Title;
-                }
-                catch
-                {
 
+                    mod.Name = project.Title;
+                    var modEntry = settings.Modlist.Mods.FirstOrDefault(v => v.Id == mod.Id);
+                    if (modEntry is not null) modEntry.Name = project.Title;
+                }
+                catch (ModrinthApiException ex)
+                {
+                    Log.Error($"Failed to fetch mod {mod.Id} ({ex.Response?.ReasonPhrase ?? ex.Error?.Error ?? ex.Message})");
                 }
             }
+
+            progressBar.Dispose();
         }
 
         return (modUpdates, modUninstalls);
@@ -326,64 +392,66 @@ public static class Install
         ImmutableArray<InstalledMod> mods = await settings.ReadMods(ct);
 
         {
-            static string GetName1(ModUpdate update) =>
-                $"{update.Mod.Name ?? update.DownloadFileName} ({update.Mod.Id})";
+            string GetName1(ModUpdate update) => settings.GetModName(update.Mod.Id) ??
+                $"{update.LockEntry?.Name ?? update.DownloadFileName} ({update.Mod.Id})";
 
-            static string GetName2(ModUninstall uninstall) =>
-                uninstall.File is not null && uninstall.LockEntry is not null
+            string GetName2(ModUninstall uninstall) => settings.GetModName(uninstall.LockEntry?.Id) ??
+                (uninstall.File is not null && uninstall.LockEntry is not null
                     ? $"{uninstall.File} ({uninstall.LockEntry.Id})"
-                    : $"{uninstall.File ?? uninstall.LockEntry?.Id}";
+                    : $"{uninstall.File ?? uninstall.LockEntry?.Id}");
 
             int nameMaxWidth = 0;
             nameMaxWidth = modUpdates.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, GetName1(v).Length));
             nameMaxWidth = modUninstalls.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, GetName2(v).Length));
             nameMaxWidth += 2;
 
-            foreach (ModUpdate update in modUpdates)
+            if (modUpdates.Count > 0 || modUninstalls.Count > 0)
             {
-                string name = GetName1(update);
-
-                switch (update.Reason)
-                {
-                    case ModUpdateReason.NewVersion:
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write("^ ");
-                        break;
-                    case ModUpdateReason.HashChanged:
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write("^ ");
-                        break;
-                    case ModUpdateReason.NotInstalled:
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write("+ ");
-                        break;
-                    case ModUpdateReason.InvalidHash:
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write("+ ");
-                        break;
-                }
-                Console.ResetColor();
-
-                Console.Write(name);
-                Console.Write(new string(' ', nameMaxWidth - name.Length));
-
-                var existing = update.LockEntry is null ? null : mods.FirstOrDefault(v => Path.GetFileName(v.FileName) == update.LockEntry.FileName).Mod;
-
-                if (existing is not null)
-                {
-                    Console.Write($"({existing.Version} -> {update.Version.VersionNumber})");
-                }
-                else
-                {
-                    Console.Write($"({update.Version.VersionNumber})");
-                }
-
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($" ({update.Version.Name})");
-                Console.ResetColor();
-
                 Console.WriteLine();
             }
+
+            foreach (ModUpdate update in modUpdates)
+                {
+                    string name = GetName1(update);
+
+                    switch (update.Reason)
+                    {
+                        case ModUpdateReason.NewVersion:
+                        case ModUpdateReason.HashChanged:
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.Write("^ ");
+                            break;
+                        case ModUpdateReason.InvalidHash:
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.Write("^ ");
+                            break;
+                        case ModUpdateReason.NotInstalled:
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.Write("+ ");
+                            break;
+                    }
+                    Console.ResetColor();
+
+                    Console.Write(name);
+                    Console.Write(new string(' ', nameMaxWidth - name.Length));
+
+                    var existing = update.LockEntry is null ? null : mods.FirstOrDefault(v => Path.GetFileName(v.FileName) == update.LockEntry.FileName).Mod;
+
+                    if (existing is not null)
+                    {
+                        Console.Write($"({existing.Version} -> {update.Version.VersionNumber})");
+                    }
+                    else
+                    {
+                        Console.Write($"({update.Version.VersionNumber})");
+                    }
+
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($" ({update.Version.Name})");
+                    Console.ResetColor();
+
+                    Console.WriteLine();
+                }
 
             foreach (ModUninstall uninstall in modUninstalls)
             {
@@ -408,7 +476,7 @@ public static class Install
 
         if (modUpdates.Count == 0 && modUninstalls.Count == 0)
         {
-            Log.Notice($"No actions have to be done");
+            Log.Info($"No actions have to be done");
         }
         else
         {
@@ -416,32 +484,24 @@ public static class Install
             {
                 await File.WriteAllTextAsync(Settings.ModlistPath, JsonSerializer.Serialize(settings.Modlist, Utils.JsonSerializerOptions), ct);
 
-                LogEntry lastLine = default;
-                Log.Keep(lastLine);
+                ProgressBar progressBar = new();
 
                 for (int i = 0; i < modUpdates.Count; i++)
                 {
                     ModUpdate update = modUpdates[i];
 
-                    string name = update.Mod.Name ?? update.Mod.Id;
+                    progressBar.Report(update.LockEntry?.Name ?? update.Mod.Id, i, modUpdates.Count);
 
-                    lastLine.Back();
-                    Log.Rekeep(lastLine =
-                        Log.Write(name) +
-                        Log.Write(new string(' ', Math.Max(0, Console.WindowWidth / 2 - name.Length))) +
-                        Log.Progress(i, modUpdates.Count));
-
-                    await Install.DownloadMod(update, settings.ModlistLock, settings.ModsDirectory, ct);
+                    await Install.DownloadMod(update, settings, ct);
                 }
 
-                lastLine.Clear();
-                Log.Unkeep();
+                progressBar.Dispose();
 
                 for (int i = 0; i < modUninstalls.Count; i++)
                 {
                     var uninstall = modUninstalls[i];
 
-                    Install.UninstallMod(uninstall, settings.ModlistLock, settings.ModsDirectory);
+                    Install.UninstallMod(uninstall, settings);
                     await File.WriteAllTextAsync(Settings.ModlistLockPath, JsonSerializer.Serialize(settings.ModlistLock, Utils.JsonSerializerOptions), ct);
                 }
             }

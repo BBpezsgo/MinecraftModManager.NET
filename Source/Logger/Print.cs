@@ -9,17 +9,31 @@ readonly struct LogEntry(string text) : IAdditionOperators<LogEntry, LogEntry, L
     public void Clear()
     {
         if (string.IsNullOrEmpty(_text)) return;
-        string b = new('\b', _text.Length);
-        Console.Write(b);
-        Console.Write(new string(' ', _text.Length));
-        Console.Write(b);
+        if (Console.IsOutputRedirected)
+        {
+            Console.WriteLine();
+        }
+        else
+        {
+            string b = new('\b', _text.Length);
+            Console.Write(b);
+            Console.Write(new string(' ', _text.Length));
+            Console.Write(b);
+        }
     }
 
     public void Back()
     {
         if (string.IsNullOrEmpty(_text)) return;
-        string b = new('\b', _text.Length);
-        Console.Write(b);
+        if (Console.IsOutputRedirected)
+        {
+            Console.WriteLine();
+        }
+        else
+        {
+            string b = new('\b', _text.Length);
+            Console.Write(b);
+        }
     }
 
     public static LogEntry operator +(LogEntry left, LogEntry right) => new((left._text ?? string.Empty) + (right._text ?? string.Empty));
@@ -63,9 +77,17 @@ static partial class Log
     {
         LastLogEntry.Clear();
 
-        Console.ForegroundColor = ConsoleColor.White;
+        Console.WriteLine();
+
+        Console.Write("\e[1m");
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
         Console.Write(":: ");
+
+        Console.ForegroundColor = ConsoleColor.White;
         Console.WriteLine(title);
+
+        Console.Write("\e[22m");
         Console.ResetColor();
 
         Console.Write(LastLogEntry);
@@ -76,19 +98,7 @@ static partial class Log
         LastLogEntry.Clear();
 
         Console.ForegroundColor = ConsoleColor.White;
-        Console.Write("==> ");
-        Console.WriteLine(text);
-        Console.ResetColor();
-
-        Console.Write(LastLogEntry);
-    }
-
-    public static void SubAction(string text)
-    {
-        LastLogEntry.Clear();
-
-        Console.ForegroundColor = ConsoleColor.Gray;
-        Console.Write("--> ");
+        Console.Write("  ==> ");
         Console.WriteLine(text);
         Console.ResetColor();
 
@@ -100,20 +110,32 @@ static partial class Log
         LastLogEntry.Clear();
 
         Console.ForegroundColor = ConsoleColor.Gray;
-        Console.Write(" -> ");
+        Console.Write("   -> ");
         Console.WriteLine(text);
         Console.ResetColor();
 
         Console.Write(LastLogEntry);
     }
 
-    public static void Notice(string text)
+    public static void Info(string text)
     {
         LastLogEntry.Clear();
 
-        Console.ForegroundColor = ConsoleColor.Blue;
+        Console.ForegroundColor = ConsoleColor.Green;
         Console.Write(">>> ");
         Console.ForegroundColor = ConsoleColor.White;
+        Console.WriteLine(text);
+        Console.ResetColor();
+
+        Console.Write(LastLogEntry);
+    }
+
+    public static void None(string text)
+    {
+        LastLogEntry.Clear();
+
+        Console.ForegroundColor = ConsoleColor.White;
+        Console.Write("    ");
         Console.WriteLine(text);
         Console.ResetColor();
 
@@ -125,7 +147,10 @@ static partial class Log
         LastLogEntry.Clear();
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Write(">>> ");
+        Console.Write("\e[1m");
+        Console.Write(">>> WARNING: ");
+        Console.Write("\e[22m");
+
         Console.WriteLine(text);
         Console.ResetColor();
 
@@ -137,7 +162,10 @@ static partial class Log
         LastLogEntry.Clear();
 
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.Write(">>> ");
+        Console.Write("\e[1m");
+        Console.Write(">>> ERROR: ");
+        Console.Write("\e[22m");
+
         Console.WriteLine(text);
         Console.ResetColor();
 
@@ -158,15 +186,19 @@ static partial class Log
             }
             else
             {
+#if DEBUG
                 Console.Write(e.GetType().Name);
                 Console.Write(' ');
+#endif
                 Console.Write(e.Message);
                 Console.WriteLine();
+#if DEBUG
                 foreach (string item in e.StackTrace?.Split('\n') ?? [])
                 {
                     Console.Write(new string(' ', depth * 2 + 2));
                     Console.WriteLine(item.Trim());
                 }
+#endif
             }
         }
 
@@ -194,6 +226,11 @@ static partial class Log
                 }
                 exception = null;
             }
+            else if (exception is ApplicationException applicationException)
+            {
+                _(applicationException, depth++);
+                exception = null;
+            }
             else
             {
                 _(exception, depth++);
@@ -208,7 +245,10 @@ static partial class Log
         LastLogEntry.Clear();
 
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.Write(">>> ");
+        Console.Write("\e[1m");
+        Console.Write(">>> ERROR: ");
+        Console.Write("\e[22m");
+
         ErrorImpl(exception);
         Console.ResetColor();
 

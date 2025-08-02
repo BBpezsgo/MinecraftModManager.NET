@@ -9,23 +9,11 @@ public static class Check
     {
         Settings settings = Settings.Create();
 
+        Log.Section($"Performing checks");
+
         Log.MajorAction($"Checking lockfile");
-        ImmutableArray<LockfileError> lockfileErrors = await Lockfile.GetLockfileErrors(settings.ModsDirectory, settings.ModlistLock, ct);
-        foreach (LockfileError error in lockfileErrors)
-        {
-            switch (error.Status)
-            {
-                case LockfileStatus.NotTracked:
-                    Log.Error($"File {Path.GetFileName(error.File)} does not exists in the lockfile");
-                    break;
-                case LockfileStatus.ChecksumMismatch:
-                    Log.Error($"File {Path.GetFileName(error.File)} checksum mismatched");
-                    break;
-                case LockfileStatus.NotExists:
-                    Log.Error($"File {error.File} does not exists");
-                    break;
-            }
-        }
+
+        await Lockfile.GetLockfileErrors(settings.ModsDirectory, settings.ModlistLock, true, ct);
 
         Log.MajorAction($"Checking dependencies");
         var (errors, ok) = await DependencyResolution.CheckDependencies(settings, false, ct);
@@ -50,7 +38,7 @@ public static class Check
                     continue;
                 }
 
-                Log.Notice($"Mod {error.OtherId} found online as {result.Title} by {result.Author}");
+                Log.Info($"Mod {error.OtherId} found online as {result.Title} by {result.Author}");
 
                 if (!Log.AskYesNo($"Is this the correct mod?"))
                 {

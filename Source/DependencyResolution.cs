@@ -156,10 +156,10 @@ public static class DependencyResolution
                         case DependencyStatus.OK:
                             break;
                         case DependencyStatus.VersionMismatch:
-                            if (!printErrorsOnly) Log.Notice($"Suggestion {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Mod.Version})");
+                            if (!printErrorsOnly) Log.Info($"Suggestion {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Mod.Version})");
                             break;
                         case DependencyStatus.NotFound:
-                            if (!printErrorsOnly) Log.Notice($"Suggestion {dep.Key} {dep.Value} for mod {mod.Id} not installed");
+                            if (!printErrorsOnly) Log.Info($"Suggestion {dep.Key} {dep.Value} for mod {mod.Id} not installed");
                             break;
                     }
                 }

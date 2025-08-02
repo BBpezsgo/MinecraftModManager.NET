@@ -1,61 +1,48 @@
+using System.Runtime.Serialization;
 using Modrinth;
 
 namespace MMM.Actions;
 
 public static class Remove
 {
-    public static async Task PerformRemove(string mod, CancellationToken ct)
+    public static async Task PerformRemove(string modName, CancellationToken ct)
     {
         ModrinthClient client = new(Settings.ModrinthClientConfig);
         Settings settings = Settings.Create();
 
-        int i = -1;
-        for (int j = 0; j < settings.Modlist.Mods.Count; j++)
+        string? modId = await settings.GetModId(modName, ct);
+        ModlistEntry? mod = settings.Modlist.Mods.FirstOrDefault(v => v.Id == modId);
+        ModlistLockEntry? modlock = settings.ModlistLock.FirstOrDefault(v => v.Id == modId);
+
+        if (modlock is null)
         {
-            ModlistEntry v = settings.Modlist.Mods[j];
-
-            if (v.Id == mod) goto found;
-            if (v.Name is not null && v.Name.Equals(mod, StringComparison.InvariantCultureIgnoreCase)) goto found;
-
-            var lockfile = settings.ModlistLock.FirstOrDefault(l => v.Id == l.Id);
-            if (lockfile is null) continue;
-
-            string filename = Path.GetFullPath(Path.Combine(settings.ModsDirectory, lockfile.FileName));
-            if (!File.Exists(filename)) continue;
-
-            Fabric.FabricMod? fabricMod;
-            try
-            {
-                fabricMod = await InstalledMods.ReadMod(filename, ct);
-            }
-            catch (Exception e)
-            {
-                Log.Error(e);
-                continue;
-            }
-
-            if (fabricMod.Id.Equals(mod, StringComparison.InvariantCultureIgnoreCase)) goto found;
-            if (fabricMod.Name is not null && fabricMod.Name.Equals(mod, StringComparison.InvariantCultureIgnoreCase)) goto found;
-
-            continue;
-
-        found:;
-            if (i != -1)
-            {
-                Log.Error($"Multiple mods found");
-                return;
-            }
-
-            i = j;
-        }
-
-        if (i == -1)
-        {
-            Log.Error($"Mod {mod} not installed");
+            Log.Error($"Mod {modName} not installed");
             return;
         }
 
-        settings.Modlist.Mods.RemoveAt(i);
+        List<ModlistLockEntry> usedBy = [.. settings.ModlistLock.Where(v => v.Dependencies.Contains(modlock.Id))];
+
+        if (usedBy.Count > 0)
+        {
+            Log.Error($"Mod {modlock.Name ?? modName} is used by the following mod(s):");
+            foreach (var item in usedBy)
+            {
+                Log.None(item.Name ?? item.FileName ?? item.Id);
+            }
+        }
+
+        if (mod is null)
+        {
+            Log.Error($"Mod {modName} was implicitly installed therefore cannot be uninstalled");
+            return;
+        }
+
+        if (usedBy.Count > 0 && !Log.AskYesNo("Do you want to continue?", false))
+        {
+            return;
+        }
+
+        settings.Modlist.Mods.Remove(mod);
 
         var (updates, uninstalls) = await Install.CheckChanges(settings, client, ct);
 

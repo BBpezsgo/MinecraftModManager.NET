@@ -61,7 +61,7 @@ public static class Program
                 task = Actions.Remove.PerformRemove(args[1], cts.Token);
                 break;
             default:
-                Log.Notice($"Invalid action {args[0]}");
+                Log.Error($"Invalid action {args[0]}");
                 return;
         }
 
