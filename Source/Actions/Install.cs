@@ -352,32 +352,38 @@ public static class Install
 
             progressBar = new();
 
-            List<ModlistLockEntry> modsWithMissingMetadata = [
-                .. settings.ModlistLock,
+            List<string> modsWithMissingMetadata = [
+                .. settings.ModlistLock.Select(v => v.Id),
             ];
+            modsWithMissingMetadata.AddRange(modUpdates.Where(v => v.LockEntry is not null).Select(v => v.LockEntry!.Id).Where(v => v is not null && !modsWithMissingMetadata.Any(w => v == w))!);
+            modsWithMissingMetadata.AddRange(modUninstalls.Where(v => v.LockEntry is not null).Select(v => v.LockEntry!.Id).Where(v => v is not null && !modsWithMissingMetadata.Any(w => v == w))!);
+            modsWithMissingMetadata.AddRange(settings.Modlist.Mods.Select(v => v.Id).Where(v => v is not null && !modsWithMissingMetadata.Any(w => v == w))!);
 
-            modsWithMissingMetadata.AddRange(modUpdates.Select(v => v.LockEntry).Where(v => v is not null && !modsWithMissingMetadata.Any(w => v.Id == w.Id))!);
-            modsWithMissingMetadata.AddRange(modUninstalls.Select(v => v.LockEntry).Where(v => v is not null && !modsWithMissingMetadata.Any(w => v.Id == w.Id))!);
-
-            modsWithMissingMetadata.RemoveAll(v => v.Name is not null);
+            modsWithMissingMetadata.RemoveAll(v => settings.GetModName(v) is not null);
 
             for (int i = 0; i < modsWithMissingMetadata.Count; i++)
             {
-                ModlistLockEntry mod = modsWithMissingMetadata[i];
+                string? mod = modsWithMissingMetadata[i];
 
-                progressBar.Report(mod.Name ?? mod.Id, i, modsWithMissingMetadata.Count);
+                progressBar.Report(mod, i, modsWithMissingMetadata.Count);
 
                 try
                 {
-                    Modrinth.Models.Project project = await client.Project.GetAsync(mod.Id, ct);
+                    Modrinth.Models.Project project = await client.Project.GetAsync(mod, ct);
 
-                    mod.Name = project.Title;
-                    var modEntry = settings.Modlist.Mods.FirstOrDefault(v => v.Id == mod.Id);
+                    var lockEntry = settings.ModlistLock.FirstOrDefault(v => v.Id == mod);
+                    if (lockEntry is not null)
+                    {
+                        lockEntry.Name = project.Title;
+                        await File.WriteAllTextAsync(Settings.ModlistLockPath, JsonSerializer.Serialize(settings.ModlistLock, Utils.JsonSerializerOptions), ct);
+                    }
+
+                    var modEntry = settings.Modlist.Mods.FirstOrDefault(v => v.Id == mod);
                     if (modEntry is not null) modEntry.Name = project.Title;
                 }
                 catch (ModrinthApiException ex)
                 {
-                    Log.Error($"Failed to fetch mod {mod.Id} ({ex.Response?.ReasonPhrase ?? ex.Error?.Error ?? ex.Message})");
+                    Log.Error($"Failed to fetch mod {mod} ({ex.Response?.ReasonPhrase ?? ex.Error?.Error ?? ex.Message})");
                 }
             }
 

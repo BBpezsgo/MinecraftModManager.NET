@@ -60,6 +60,15 @@ public static class Program
 
                 task = Actions.Remove.PerformRemove(args[1], cts.Token);
                 break;
+            case "list":
+                if (args.Length != 1)
+                {
+                    Log.Error($"Wrong number of arguments passed");
+                    return;
+                }
+
+                task = Actions.List.PerformList(cts.Token);
+                break;
             default:
                 Log.Error($"Invalid action {args[0]}");
                 return;
