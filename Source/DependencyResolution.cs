@@ -86,8 +86,8 @@ public static class DependencyResolution
         foreach (InstalledMod installedMod in mods)
         {
             FabricMod mod = installedMod.Mod;
-            ModlistLockEntry? lockEntry = settings.ModlistLock.FirstOrDefault(v => v.FileName == Path.GetFileName(installedMod.FileName));
-            ModlistEntry? modEntry = lockEntry is null ? null : settings.Modlist.Mods.FirstOrDefault(v => v.Id == lockEntry.Id);
+            ModLock? lockEntry = settings.ModlistLock.FirstOrDefault(v => v.FileName == Path.GetFileName(installedMod.FileName));
+            ModEntry? modEntry = lockEntry is null ? null : settings.Modlist.Mods.FirstOrDefault(v => v.Id == lockEntry.Id);
 
             if (lockEntry is null) continue;
 

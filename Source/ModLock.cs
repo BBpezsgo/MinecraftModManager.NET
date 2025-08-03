@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace MMM;
 
-public class ModlistLockEntry
+public class ModLock
 {
     [JsonPropertyName("id")] public required string Id { get; init; }
     [JsonPropertyName("name")] public string? Name { get; set; }

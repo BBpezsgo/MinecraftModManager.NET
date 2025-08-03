@@ -6,20 +6,6 @@ namespace MMM;
 
 public static class Utils
 {
-    public static int IndexOf<T>(this IEnumerable<T> elements, Predicate<T> predicate)
-    {
-        int i = 0;
-        foreach (var item in elements)
-        {
-            if (predicate.Invoke(item))
-            {
-                return i;
-            }
-            i++;
-        }
-        return -1;
-    }
-
     public static readonly JsonSerializerOptions JsonSerializerOptions = new(JsonSerializerDefaults.General)
     {
         WriteIndented = true,

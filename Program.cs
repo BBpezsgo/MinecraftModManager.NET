@@ -69,6 +69,15 @@ public static class Program
 
                 task = Actions.List.PerformList(cts.Token);
                 break;
+            case "change":
+                if (args.Length != 2)
+                {
+                    Log.Error($"Wrong number of arguments passed");
+                    return;
+                }
+
+                task = Actions.Change.PerformChange(args[1], cts.Token);
+                break;
             default:
                 Log.Error($"Invalid action {args[0]}");
                 return;

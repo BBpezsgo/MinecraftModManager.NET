@@ -4,21 +4,33 @@ namespace MMM.Actions;
 
 public static class Add
 {
-    public static async Task PerformAdd(string mod, CancellationToken ct)
+    public static async Task PerformAdd(string query, CancellationToken ct)
     {
         ModrinthClient client = new(Settings.ModrinthClientConfig);
         Settings settings = Settings.Create();
 
-        if (settings.Modlist.Mods.Any(v => v.Id == mod) &&
-            settings.ModlistLock.Any(v => v.Id == mod))
+        if (settings.Modlist.Mods.Any(v => v.Id == query) &&
+            settings.ModlistLock.Any(v => v.Id == query))
         {
-            Log.Error($"Mod {mod} already added");
+            Log.Error($"Mod {query} already added");
             return;
         }
 
-        settings.Modlist.Mods.Add(new ModlistEntry()
+        (string? id, string? name) = await Install.FindModOnline(query, client, ct);
+
+        if (id is null) return;
+
+        if (settings.Modlist.Mods.Any(v => v.Id == id) &&
+            settings.ModlistLock.Any(v => v.Id == id))
         {
-            Id = mod,
+            Log.Error($"Mod {name ?? query} already added");
+            return;
+        }
+
+        settings.Modlist.Mods.Add(new ModEntry()
+        {
+            Id = id,
+            Name = query,
         });
 
         var (updates, uninstalls) = await Install.CheckChanges(settings, client, ct);

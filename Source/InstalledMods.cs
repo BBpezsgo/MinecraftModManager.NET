@@ -28,19 +28,6 @@ public static class InstalledMods
         }
     }
 
-    public static async Task<FabricMod> ReadMod(string file, CancellationToken ct)
-    {
-        try
-        {
-            using ZipArchive archive = await ZipFile.OpenReadAsync(file, ct);
-            return await ReadMod(archive, file, ct);
-        }
-        catch (InvalidDataException ex)
-        {
-            throw new ModLoadException($"Invalid mod file", ex);
-        }
-    }
-
     static async Task ReadMod(ZipArchive archive, string filename, ImmutableArray<InstalledMod>.Builder result, CancellationToken ct)
     {
         FabricMod content = await ReadMod(archive, filename, ct);
@@ -99,5 +86,4 @@ public static class InstalledMods
 
         return installedMods.ToImmutable();
     }
-
 }

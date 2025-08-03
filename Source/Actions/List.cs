@@ -10,7 +10,7 @@ public static class List
 
         foreach (var lockEntry in settings.ModlistLock)
         {
-            ModlistEntry? modEntry = settings.Modlist.Mods.FirstOrDefault(v => v.Id == lockEntry.Id);
+            ModEntry? modEntry = settings.Modlist.Mods.FirstOrDefault(v => v.Id == lockEntry.Id);
             bool isDependency = settings.ModlistLock.Any(v => v.Dependencies.Contains(lockEntry.Id));
 
             string? name = settings.GetModName(lockEntry.Id) ?? lockEntry.FileName;

@@ -11,8 +11,8 @@ public static class Remove
         Settings settings = Settings.Create();
 
         string? modId = await settings.GetModId(modName, ct);
-        ModlistEntry? mod = settings.Modlist.Mods.FirstOrDefault(v => v.Id == modId);
-        ModlistLockEntry? modlock = settings.ModlistLock.FirstOrDefault(v => v.Id == modId);
+        ModEntry? mod = settings.Modlist.Mods.FirstOrDefault(v => v.Id == modId);
+        ModLock? modlock = settings.ModlistLock.FirstOrDefault(v => v.Id == modId);
 
         if (modlock is null)
         {
@@ -20,7 +20,7 @@ public static class Remove
             return;
         }
 
-        List<ModlistLockEntry> usedBy = [.. settings.ModlistLock.Where(v => v.Dependencies.Contains(modlock.Id))];
+        List<ModLock> usedBy = [.. settings.ModlistLock.Where(v => v.Dependencies.Contains(modlock.Id))];
 
         if (usedBy.Count > 0)
         {

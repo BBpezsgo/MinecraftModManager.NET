@@ -24,12 +24,12 @@ Convinient command line mod manager for Minecraft using Modrinth.
 
 `mmm check` - Checks for dependencies and conflicts, and tries to download the missing mods. And also checks the validity of the lock-file. (untracked/missing files) (I want to implement more features)
 
+`mmm change <version>` - Replaces all the mods with the specified Minecraft version. (unsupported mods will be deleted)
+
 > You can get the Modrinth id of a mod by going to the mod's page, clicking on the three dots (top right) and clicking "Copy ID".
 
 ## TODO
 
-- Check for dependencies and conflicts when adding/removing/updating a mod. (WIP)
-- Easier Minecraft version change & check. (you can remove the mods folder and the lock file and set the Minecraft version)
-- Use the automatic mod search in more places.
+- Check for conflicts when adding/removing/updating a mod. (WIP)
 
 All this was heavily inspired by [this project](https://github.com/meza/minecraft-mod-manager/).

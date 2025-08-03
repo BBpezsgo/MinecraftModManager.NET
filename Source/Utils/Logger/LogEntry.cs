@@ -1,0 +1,47 @@
+using System.Numerics;
+
+namespace MMM;
+
+readonly struct LogEntry(string text) : IAdditionOperators<LogEntry, LogEntry, LogEntry>, IEquatable<LogEntry>
+{
+    readonly string _text = text;
+
+    public void Clear()
+    {
+        if (string.IsNullOrEmpty(_text)) return;
+        if (Console.IsOutputRedirected)
+        {
+            Console.WriteLine();
+        }
+        else
+        {
+            string b = new('\b', _text.Length);
+            Console.Write(b);
+            Console.Write(new string(' ', _text.Length));
+            Console.Write(b);
+        }
+    }
+
+    public void Back()
+    {
+        if (string.IsNullOrEmpty(_text)) return;
+        if (Console.IsOutputRedirected)
+        {
+            Console.WriteLine();
+        }
+        else
+        {
+            string b = new('\b', _text.Length);
+            Console.Write(b);
+        }
+    }
+
+    public static LogEntry operator +(LogEntry left, LogEntry right) => new((left._text ?? string.Empty) + (right._text ?? string.Empty));
+
+    public override string ToString() => _text;
+
+    public bool Equals(LogEntry other) => string.Equals(_text, other._text);
+
+    public static implicit operator string(LogEntry v) => v._text ?? string.Empty;
+    public static implicit operator LogEntry(string? v) => new(v ?? string.Empty);
+}

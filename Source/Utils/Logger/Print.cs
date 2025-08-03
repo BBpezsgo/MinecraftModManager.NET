@@ -1,54 +1,31 @@
-using System.Numerics;
-
 namespace MMM;
-
-readonly struct LogEntry(string text) : IAdditionOperators<LogEntry, LogEntry, LogEntry>, IEquatable<LogEntry>
-{
-    readonly string _text = text;
-
-    public void Clear()
-    {
-        if (string.IsNullOrEmpty(_text)) return;
-        if (Console.IsOutputRedirected)
-        {
-            Console.WriteLine();
-        }
-        else
-        {
-            string b = new('\b', _text.Length);
-            Console.Write(b);
-            Console.Write(new string(' ', _text.Length));
-            Console.Write(b);
-        }
-    }
-
-    public void Back()
-    {
-        if (string.IsNullOrEmpty(_text)) return;
-        if (Console.IsOutputRedirected)
-        {
-            Console.WriteLine();
-        }
-        else
-        {
-            string b = new('\b', _text.Length);
-            Console.Write(b);
-        }
-    }
-
-    public static LogEntry operator +(LogEntry left, LogEntry right) => new((left._text ?? string.Empty) + (right._text ?? string.Empty));
-
-    public override string ToString() => _text;
-
-    public bool Equals(LogEntry other) => string.Equals(_text, other._text);
-
-    public static implicit operator string(LogEntry v) => v._text ?? string.Empty;
-    public static implicit operator LogEntry(string? v) => new(v ?? string.Empty);
-}
 
 static partial class Log
 {
     static LogEntry LastLogEntry = default;
+    public static List<Lock> InteractiveLocks = [];
+
+    readonly struct AutoScope : IDisposable
+    {
+        public void Dispose()
+        {
+            Console.Write(LastLogEntry);
+            foreach (Lock item in InteractiveLocks)
+            {
+                item.Exit();
+            }
+        }
+    }
+
+    static AutoScope Auto()
+    {
+        foreach (Lock item in InteractiveLocks)
+        {
+            item.Enter();
+        }
+        LastLogEntry.Clear();
+        return new AutoScope();
+    }
 
     public static void Keep(LogEntry logEntry)
     {
@@ -75,7 +52,7 @@ static partial class Log
 
     public static void Section(string title)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         Console.WriteLine();
 
@@ -89,62 +66,52 @@ static partial class Log
 
         Console.Write("\e[22m");
         Console.ResetColor();
-
-        Console.Write(LastLogEntry);
     }
 
     public static void MajorAction(string text)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         Console.ForegroundColor = ConsoleColor.White;
         Console.Write("  ==> ");
         Console.WriteLine(text);
         Console.ResetColor();
-
-        Console.Write(LastLogEntry);
     }
 
     public static void MinorAction(string text)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         Console.ForegroundColor = ConsoleColor.Gray;
         Console.Write("   -> ");
         Console.WriteLine(text);
         Console.ResetColor();
-
-        Console.Write(LastLogEntry);
     }
 
     public static void Info(string text)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         Console.ForegroundColor = ConsoleColor.Green;
         Console.Write(">>> ");
         Console.ForegroundColor = ConsoleColor.White;
         Console.WriteLine(text);
         Console.ResetColor();
-
-        Console.Write(LastLogEntry);
     }
 
     public static void None(string text)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         Console.ForegroundColor = ConsoleColor.White;
         Console.Write("    ");
         Console.WriteLine(text);
         Console.ResetColor();
-
-        Console.Write(LastLogEntry);
     }
 
     public static void Warning(string text)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.Write("\e[1m");
@@ -153,13 +120,11 @@ static partial class Log
 
         Console.WriteLine(text);
         Console.ResetColor();
-
-        Console.Write(LastLogEntry);
     }
 
     public static void Error(string text)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         Console.ForegroundColor = ConsoleColor.Red;
         Console.Write("\e[1m");
@@ -168,8 +133,6 @@ static partial class Log
 
         Console.WriteLine(text);
         Console.ResetColor();
-
-        Console.Write(LastLogEntry);
     }
 
     static void ErrorImpl(Exception? exception)
@@ -242,7 +205,7 @@ static partial class Log
 
     public static void Error(Exception exception)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         Console.ForegroundColor = ConsoleColor.Red;
         Console.Write("\e[1m");
@@ -251,29 +214,23 @@ static partial class Log
 
         ErrorImpl(exception);
         Console.ResetColor();
-
-        Console.Write(LastLogEntry);
     }
 
     public static void Debug(object? text) => Debug(text?.ToString());
     public static void Debug(string? text)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         Console.ForegroundColor = ConsoleColor.Gray;
         Console.Write("    ");
         Console.WriteLine(text);
         Console.ResetColor();
-
-        Console.Write(LastLogEntry);
     }
 
     public static void NewLine(int count = 1)
     {
-        LastLogEntry.Clear();
+        using AutoScope _ = Auto();
 
         for (int i = 0; i < count; i++) Console.WriteLine();
-
-        Console.Write(LastLogEntry);
     }
 }

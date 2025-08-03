@@ -22,8 +22,8 @@ public class Settings
         UserAgent = Project.UserAgent,
     };
 
-    public required Modlist Modlist { get; init; }
-    public required List<ModlistLockEntry> ModlistLock { get; init; }
+    public required ModList Modlist { get; init; }
+    public required List<ModLock> ModlistLock { get; init; }
     public string ModsDirectory => Path.GetFullPath(Path.Combine(MinecraftPath, Modlist.ModsFolder));
 
     ImmutableArray<InstalledMod> _mods;
@@ -36,13 +36,13 @@ public class Settings
 
     public static Settings Create()
     {
-        List<ModlistLockEntry> modlistLock = [];
+        List<ModLock> modlistLock = [];
         if (File.Exists(ModlistLockPath))
         {
-            modlistLock = JsonSerializer.Deserialize<List<ModlistLockEntry>>(File.ReadAllText(ModlistLockPath)) ?? throw new JsonException();
+            modlistLock = JsonSerializer.Deserialize<List<ModLock>>(File.ReadAllText(ModlistLockPath)) ?? throw new JsonException();
         }
 
-        Modlist modlist = JsonSerializer.Deserialize<Modlist>(File.ReadAllText(ModlistPath)) ?? throw new JsonException();
+        ModList modlist = JsonSerializer.Deserialize<ModList>(File.ReadAllText(ModlistPath)) ?? throw new JsonException();
 
         return new Settings
         {

@@ -5,9 +5,9 @@ namespace MMM;
 public class ProgressBar : IDisposable, IProgress<float>
 {
     static readonly TimeSpan AnimationInterval = TimeSpan.FromSeconds(1.0 / 8);
-    const string Animation = @"|/-\";
 
     readonly Timer Timer;
+    readonly Lock Lock;
 
     float Progress = 0;
     string Title = string.Empty;
@@ -18,6 +18,8 @@ public class ProgressBar : IDisposable, IProgress<float>
     public ProgressBar()
     {
         Timer = new Timer(TimerHandler);
+        Lock = new Lock();
+        Log.InteractiveLocks.Add(Lock);
         if (Console.IsOutputRedirected) return;
 
         Log.Keep(LastLine);
@@ -28,6 +30,7 @@ public class ProgressBar : IDisposable, IProgress<float>
     public void Report(float value)
     {
         value = Math.Clamp(value, 0f, 1f);
+
         Interlocked.Exchange(ref Progress, value);
     }
 
@@ -35,15 +38,17 @@ public class ProgressBar : IDisposable, IProgress<float>
 
     public void Report(string title, float value)
     {
+        value = Math.Clamp(value, 0f, 1f);
+
         Interlocked.Exchange(ref Title, title);
-        Report(value);
+        Interlocked.Exchange(ref Progress, value);
     }
 
     public void Report(string title, int index, int length) => Report(title, (float)index / (float)length);
 
     void TimerHandler(object? state)
     {
-        lock (Timer)
+        lock (Lock)
         {
             if (IsDisposed) return;
 
@@ -89,19 +94,16 @@ public class ProgressBar : IDisposable, IProgress<float>
     {
         if (IsDisposed) return;
 
-        lock (Timer)
+        lock (Lock)
         {
             IsDisposed = true;
             LastLine.Clear();
             Log.Unkeep();
         }
 
+        Log.InteractiveLocks.Remove(Lock);
+
         IsDisposed = true;
         GC.SuppressFinalize(this);
     }
-}
-
-static partial class Log
-{
-    
 }

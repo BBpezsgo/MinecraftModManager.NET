@@ -2,26 +2,26 @@ using System.Collections.Immutable;
 
 namespace MMM;
 
-public enum LockfileStatus
+public enum LockFileStatus
 {
     NotTracked,
     ChecksumMismatch,
     NotExists,
 }
 
-public readonly struct LockfileError
+public readonly struct LockFileError
 {
-    public required LockfileStatus Status { get; init; }
+    public required LockFileStatus Status { get; init; }
     public required string File { get; init; }
-    public required ModlistLockEntry? Entry { get; init; }
+    public required ModLock? Entry { get; init; }
 }
 
-public static class Lockfile
+public static class LockFile
 {
-    public static async Task<ImmutableArray<LockfileError>> GetLockfileErrors(string modsDirectory, IReadOnlyList<ModlistLockEntry> modlistLock, bool print, CancellationToken ct)
+    public static async Task<ImmutableArray<LockFileError>> GetLockfileErrors(string modsDirectory, IReadOnlyList<ModLock> modlistLock, bool print, CancellationToken ct)
     {
         List<InstalledComponent> installedMods = [];
-        var errors = ImmutableArray.CreateBuilder<LockfileError>();
+        var errors = ImmutableArray.CreateBuilder<LockFileError>();
 
         ProgressBar progressBar = new();
 
@@ -40,9 +40,9 @@ public static class Lockfile
 
                 if (lockEntry is null)
                 {
-                    errors.Add(new LockfileError()
+                    errors.Add(new LockFileError()
                     {
-                        Status = LockfileStatus.NotTracked,
+                        Status = LockFileStatus.NotTracked,
                         File = file,
                         Entry = null,
                     });
@@ -52,9 +52,9 @@ public static class Lockfile
 
                 if (hash != lockEntry.Hash)
                 {
-                    errors.Add(new LockfileError()
+                    errors.Add(new LockFileError()
                     {
-                        Status = LockfileStatus.ChecksumMismatch,
+                        Status = LockFileStatus.ChecksumMismatch,
                         File = file,
                         Entry = lockEntry,
                     });
@@ -66,7 +66,7 @@ public static class Lockfile
 
         for (int i = 0; i < modlistLock.Count; i++)
         {
-            ModlistLockEntry lockEntry = modlistLock[i];
+            ModLock lockEntry = modlistLock[i];
 
             progressBar.Report(lockEntry.Name ?? lockEntry.Id, i, modlistLock.Count);
 
@@ -74,9 +74,9 @@ public static class Lockfile
 
             if (!File.Exists(file))
             {
-                errors.Add(new LockfileError()
+                errors.Add(new LockFileError()
                 {
-                    Status = LockfileStatus.NotExists,
+                    Status = LockFileStatus.NotExists,
                     File = file,
                     Entry = lockEntry,
                 });

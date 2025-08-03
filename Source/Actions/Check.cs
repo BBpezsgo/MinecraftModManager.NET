@@ -13,7 +13,7 @@ public static class Check
 
         Log.MajorAction($"Checking lockfile");
 
-        await Lockfile.GetLockfileErrors(settings.ModsDirectory, settings.ModlistLock, true, ct);
+        await LockFile.GetLockfileErrors(settings.ModsDirectory, settings.ModlistLock, true, ct);
 
         Log.MajorAction($"Checking dependencies");
         var (errors, ok) = await DependencyResolution.CheckDependencies(settings, false, ct);
@@ -24,31 +24,14 @@ public static class Check
         {
             if (error.Level == DependencyErrorLevel.Depends)
             {
-                Modrinth.Models.SearchResult? result = (await client.Project.SearchAsync(
-                    error.OtherId.Replace('-', ' '),
-                    Modrinth.Models.Enums.Index.Downloads,
-                    0,
-                    1,
-                    null,
-                    ct)).Hits.FirstOrDefault();
+                (string? id, string? name) = await Install.FindModOnline(error.OtherId, client, ct);
 
-                if (result is null)
+                if (id is null) continue;
+
+                settings.Modlist.Mods.Add(new ModEntry()
                 {
-                    Log.Error($"Mod {error.OtherId} not found online");
-                    continue;
-                }
-
-                Log.Info($"Mod {error.OtherId} found online as {result.Title} by {result.Author}");
-
-                if (!Log.AskYesNo($"Is this the correct mod?"))
-                {
-                    continue;
-                }
-
-                settings.Modlist.Mods.Add(new ModlistEntry()
-                {
-                    Id = result.ProjectId,
-                    Name = result.Title,
+                    Id = id,
+                    Name = name,
                 });
             }
         }
