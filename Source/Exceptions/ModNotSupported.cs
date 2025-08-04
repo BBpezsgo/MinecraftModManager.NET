@@ -1,9 +1,3 @@
 namespace MMM;
 
-public class ModNotSupported : ApplicationException
-{
-    public ModNotSupported(string message, Exception? inner = null) : base(message, inner)
-    {
-
-    }
-}
+public class ModNotSupported(string message, Exception? inner = null) : ApplicationException(message, inner);

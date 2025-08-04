@@ -3,23 +3,6 @@ using MMM.Fabric;
 
 namespace MMM;
 
-public enum DependencyErrorLevel
-{
-    Depends,
-    Recommends,
-    Suggests,
-    Conflicts,
-    Breaks,
-}
-
-public readonly struct DependencyError
-{
-    public required DependencyErrorLevel Level { get; init; }
-    public required InstalledMod Subject { get; init; }
-    public required string OtherId { get; init; }
-    public required InstalledComponent? OtherInstalled { get; init; }
-}
-
 public static class DependencyResolution
 {
     enum DependencyStatus
@@ -35,7 +18,7 @@ public static class DependencyResolution
 
         foreach (InstalledComponent installedMod in mods)
         {
-            var mod = installedMod.Mod;
+            GenericComponent mod = installedMod.Component;
 
             if (mod.Id != id)
             {
@@ -63,22 +46,46 @@ public static class DependencyResolution
         }
     }
 
-    static bool ShouldSkip(string dependency) =>
-        dependency == "fabricloader" ||
-        dependency == "java" ||
-        dependency == "another-mod";
+    static bool ShouldSkip(string dependency) => dependency is "fabricloader" or "java" or "another-mod";
 
-    public static async Task<(ImmutableArray<DependencyError> Errors, bool Ok)> CheckDependencies(Settings settings, bool printErrorsOnly, CancellationToken ct)
+    public static async Task<(ImmutableArray<DependencyError> Errors, bool Ok)> CheckDependencies(Context settings, bool printErrorsOnly, CancellationToken ct)
     {
-        ImmutableArray<InstalledMod> mods = await settings.ReadMods(ct);
-        ImmutableArray<InstalledComponent> components = [
-            .. mods.Select(v => new InstalledComponent(v.FileName, v.Mod)),
-            new InstalledComponent(null, new GenericComponent(){
+        ImmutableArray<InstalledMod> mods = await settings.GetMods(ct);
+        List<InstalledComponent> _components = [
+            .. mods.Select(v => new InstalledComponent()
+            {
+                FileName = v.FileName,
+                Component = v.Mod,
+            }),
+        ];
+
+        _components.Add(new InstalledComponent()
+        {
+            FileName = null,
+            Component = new GenericComponent()
+            {
                 Name = "Minecraft",
                 Id = "minecraft",
                 Version = settings.Modlist.GameVersion,
-            }),
-        ];
+            },
+        });
+
+        string? javaVersion = Java.GetVersion();
+        if (javaVersion is not null)
+        {
+            _components.Add(new InstalledComponent()
+            {
+                FileName = null,
+                Component = new GenericComponent()
+                {
+                    Name = "Java",
+                    Id = "java",
+                    Version = javaVersion,
+                },
+            });
+        }
+
+        ImmutableArray<InstalledComponent> components = [.. _components];
 
         ImmutableArray<DependencyError>.Builder errors = ImmutableArray.CreateBuilder<DependencyError>();
         bool ok = true;
@@ -93,10 +100,10 @@ public static class DependencyResolution
 
             if (mod.Depends is not null)
             {
-                foreach (var dep in mod.Depends)
+                foreach (KeyValuePair<string, VersionRange> dep in mod.Depends)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
+                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {
@@ -105,7 +112,7 @@ public static class DependencyResolution
                         case DependencyStatus.VersionMismatch:
                             ok = false;
 
-                            Log.Error($"Dependency {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Mod.Version})");
+                            Log.Error($"Dependency {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
                             break;
                         case DependencyStatus.NotFound:
                             errors.Add(new DependencyError()
@@ -125,17 +132,17 @@ public static class DependencyResolution
 
             if (mod.Recommends is not null)
             {
-                foreach (var dep in mod.Recommends)
+                foreach (KeyValuePair<string, VersionRange> dep in mod.Recommends)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
+                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {
                         case DependencyStatus.OK:
                             break;
                         case DependencyStatus.VersionMismatch:
-                            if (!printErrorsOnly) Log.Warning($"Recommendation {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Mod.Version})");
+                            if (!printErrorsOnly) Log.Warning($"Recommendation {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
                             break;
                         case DependencyStatus.NotFound:
                             if (!printErrorsOnly) Log.Warning($"Recommendation {dep.Key} {dep.Value} for mod {mod.Id} not installed");
@@ -146,17 +153,17 @@ public static class DependencyResolution
 
             if (mod.Suggests is not null)
             {
-                foreach (var dep in mod.Suggests)
+                foreach (KeyValuePair<string, VersionRange> dep in mod.Suggests)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
+                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {
                         case DependencyStatus.OK:
                             break;
                         case DependencyStatus.VersionMismatch:
-                            if (!printErrorsOnly) Log.Info($"Suggestion {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Mod.Version})");
+                            if (!printErrorsOnly) Log.Info($"Suggestion {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
                             break;
                         case DependencyStatus.NotFound:
                             if (!printErrorsOnly) Log.Info($"Suggestion {dep.Key} {dep.Value} for mod {mod.Id} not installed");
@@ -167,15 +174,15 @@ public static class DependencyResolution
 
             if (mod.Conflicts is not null)
             {
-                foreach (var dep in mod.Conflicts)
+                foreach (KeyValuePair<string, VersionRange> dep in mod.Conflicts)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
+                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {
                         case DependencyStatus.OK:
-                            if (!printErrorsOnly) Log.Warning($"Mod {other!.Value.Mod.Id} {other.Value.Mod.Version} conflicts with {mod.Id}");
+                            if (!printErrorsOnly) Log.Warning($"Mod {other!.Value.Component.Id} {other.Value.Component.Version} conflicts with {mod.Id}");
                             break;
                         case DependencyStatus.VersionMismatch:
                             break;
@@ -187,10 +194,10 @@ public static class DependencyResolution
 
             if (mod.Breaks is not null)
             {
-                foreach (var dep in mod.Breaks)
+                foreach (KeyValuePair<string, VersionRange> dep in mod.Breaks)
                 {
                     if (ShouldSkip(dep.Key)) continue;
-                    var (other, status) = FindBestMatch(dep.Key, dep.Value, components);
+                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
 
                     switch (status)
                     {
@@ -204,7 +211,7 @@ public static class DependencyResolution
                             });
                             ok = false;
 
-                            Log.Error($"Mod {other!.Value.Mod.Id} {other.Value.Mod.Version} breaks {mod.Id}");
+                            Log.Error($"Mod {other!.Value.Component.Id} {other.Value.Component.Version} breaks {mod.Id}");
                             break;
                         case DependencyStatus.VersionMismatch:
                             break;

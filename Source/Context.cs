@@ -5,7 +5,7 @@ using Modrinth;
 
 namespace MMM;
 
-public class Settings
+public class Context
 {
     public static readonly string MinecraftPath =
 #if DEBUG
@@ -28,13 +28,13 @@ public class Settings
 
     ImmutableArray<InstalledMod> _mods;
 
-    public async Task<ImmutableArray<InstalledMod>> ReadMods(CancellationToken ct)
+    public async Task<ImmutableArray<InstalledMod>> GetMods(CancellationToken ct)
     {
         if (!_mods.IsDefault) return _mods;
-        return _mods = await InstalledMods.ReadMods(ModsDirectory, ct);
+        return _mods = await ModReader.ReadMods(ModsDirectory, ct);
     }
 
-    public static Settings Create()
+    public static Context Create()
     {
         List<ModLock> modlistLock = [];
         if (File.Exists(ModlistLockPath))
@@ -44,29 +44,31 @@ public class Settings
 
         ModList modlist = JsonSerializer.Deserialize<ModList>(File.ReadAllText(ModlistPath)) ?? throw new JsonException();
 
-        return new Settings
+        return new Context
         {
             Modlist = modlist,
             ModlistLock = modlistLock,
         };
     }
 
-    public string? GetModName(string? id) =>
-        id is null ? null : (
+    public string? GetModName(string? id)
+    {
+        return id is null ? null : (
             ModlistLock.FirstOrDefault(v => v.Id == id)?.Name
             ?? Modlist.Mods.FirstOrDefault(v => v.Id == id)?.Name
         );
+    }
 
     public async Task<string?> GetModId(string name, CancellationToken ct)
     {
-        string? result = ModlistLock.FirstOrDefault(v => v.Id == name || string.Equals(v.Name, name, StringComparison.InvariantCultureIgnoreCase))?.Id;
+        string? result = ModlistLock.FirstOrDefault(v => v.Id == name || string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase))?.Id;
         if (result is not null) return result;
 
-        result = Modlist.Mods.FirstOrDefault(v => v.Id == name || string.Equals(v.Name, name, StringComparison.InvariantCultureIgnoreCase))?.Id;
+        result = Modlist.Mods.FirstOrDefault(v => v.Id == name || string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase))?.Id;
         if (result is not null) return result;
 
-        var mods = await ReadMods(ct);
-        var filename = Path.GetFileName(mods.FirstOrDefault(v => string.Equals(v.Mod.Id, name, StringComparison.InvariantCultureIgnoreCase) || string.Equals(v.Mod.Name, name, StringComparison.InvariantCultureIgnoreCase)).FileName);
+        ImmutableArray<InstalledMod> mods = await GetMods(ct);
+        string? filename = Path.GetFileName(mods.FirstOrDefault(v => string.Equals(v.Mod.Id, name, StringComparison.OrdinalIgnoreCase) || string.Equals(v.Mod.Name, name, StringComparison.OrdinalIgnoreCase)).FileName);
         if (filename is not null)
         {
             return ModlistLock.FirstOrDefault(v => v.FileName == filename)?.Id;
@@ -83,7 +85,7 @@ public class Settings
         result = Modlist.Mods.FirstOrDefault(v => v.Id == name || v.Name == name)?.Id;
         if (result is not null) return result;
 
-        var filename = Path.GetFileName(mods.FirstOrDefault(v => v.Mod.Id == name || v.Mod.Name == name).FileName);
+        string? filename = Path.GetFileName(mods.FirstOrDefault(v => v.Mod.Id == name || v.Mod.Name == name).FileName);
         if (filename is not null)
         {
             return ModlistLock.FirstOrDefault(v => v.FileName == filename)?.Id;
@@ -93,6 +95,14 @@ public class Settings
     }
 }
 
-public record struct InstalledComponent(string? FileName, GenericComponent Mod);
+public readonly struct InstalledComponent
+{
+    public required string? FileName { get; init; }
+    public required GenericComponent Component { get; init; }
+}
 
-public record struct InstalledMod(string FileName, FabricMod Mod);
+public readonly struct InstalledMod
+{
+    public required string FileName { get; init; }
+    public required FabricMod Mod { get; init; }
+}

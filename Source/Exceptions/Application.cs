@@ -1,6 +1,3 @@
 namespace MMM;
 
-public abstract class ApplicationException : Exception
-{
-    public ApplicationException(string message, Exception? inner) : base(message, inner) { }
-}
+public abstract class ApplicationException(string message, Exception? inner) : Exception(message, inner);

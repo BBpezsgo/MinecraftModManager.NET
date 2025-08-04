@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 
 namespace MMM;
@@ -52,7 +53,7 @@ public readonly struct PartialSemanticVersion(int? major, int? minor, int? patch
     public override bool Equals(object? obj) => obj is PartialSemanticVersion other && Equals(other);
     public bool Equals(PartialSemanticVersion other) => Major == other.Major && Minor == other.Minor && Patch == other.Patch;
     public override int GetHashCode() => HashCode.Combine(Major, Minor, Patch);
-    public override string ToString() => $"{(Major.HasValue ? Major.Value.ToString() : "x")}.{(Minor.HasValue ? Minor.Value.ToString() : "x")}.{(Patch.HasValue ? Patch.Value.ToString() : "x")}";
+    public override string ToString() => $"{(Major.HasValue ? Major.Value.ToString(CultureInfo.InvariantCulture) : "x")}.{(Minor.HasValue ? Minor.Value.ToString(CultureInfo.InvariantCulture) : "x")}.{(Patch.HasValue ? Patch.Value.ToString(CultureInfo.InvariantCulture) : "x")}";
 
     static readonly System.Buffers.SearchValues<char> s_version = System.Buffers.SearchValues.Create("0123456789.x");
 

@@ -4,11 +4,11 @@ public static class List
 {
     public static async Task PerformList(CancellationToken ct)
     {
-        Settings settings = Settings.Create();
+        Context settings = Context.Create();
 
         Log.MajorAction("Reading mods");
 
-        foreach (var lockEntry in settings.ModlistLock)
+        foreach (ModLock lockEntry in settings.ModlistLock)
         {
             ModEntry? modEntry = settings.Modlist.Mods.FirstOrDefault(v => v.Id == lockEntry.Id);
             bool isDependency = settings.ModlistLock.Any(v => v.Dependencies.Contains(lockEntry.Id));

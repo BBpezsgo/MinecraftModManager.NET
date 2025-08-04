@@ -7,17 +7,17 @@ public static class Update
 {
     public static async Task PerformUpdate(CancellationToken ct)
     {
-        ModrinthClient client = new(Settings.ModrinthClientConfig);
-        Settings settings = Settings.Create();
+        ModrinthClient client = new(Context.ModrinthClientConfig);
+        Context settings = Context.Create();
 
-        var (modUpdates, unsupported) = await CheckNewVersions(settings, client, ct);
+        (List<ModDownloadInfo> modUpdates, List<ModUninstallInfo> unsupported) = await CheckNewVersions(settings, client, ct);
 
-        await Install.PerformChanges(settings, modUpdates, unsupported, ct);
+        await ModInstaller.PerformChanges(settings, modUpdates, unsupported, ct);
     }
 
-    public static async Task<(List<ModUpdate> Updates, List<ModUninstall> Unsupported)> CheckNewVersions(Settings settings, ModrinthClient client, CancellationToken ct)
+    public static async Task<(List<ModDownloadInfo> Updates, List<ModUninstallInfo> Unsupported)> CheckNewVersions(Context settings, ModrinthClient client, CancellationToken ct)
     {
-        List<ModUpdate> modUpdates = [];
+        List<ModDownloadInfo> modUpdates = [];
 
         Log.Section($"Checking for updates");
         ProgressBar progressBar = new();
@@ -37,7 +37,7 @@ public static class Update
         AddThese(settings.Modlist.Mods.Select(v => v.Id));
 
         ImmutableArray<string> checkThese = [.. checkTheseSet];
-        List<ModUninstall> unsupportedMods = [];
+        List<ModUninstallInfo> unsupportedMods = [];
 
         for (int i = 0; i < checkThese.Length; i++)
         {
@@ -45,20 +45,20 @@ public static class Update
 
             progressBar.Report(settings.GetModName(modId) ?? modId, i, checkThese.Length);
 
-            ModUpdate? update;
+            ModDownloadInfo? update;
             try
             {
-                update = await Install.GetModIfNeeded(modId, settings, client, ct);
+                update = await ModrinthUtils.GetModIfNeeded(modId, settings, client, ct);
             }
             catch (ModNotSupported e)
             {
-                var modLock = settings.ModlistLock.FirstOrDefault(v => v.Id == modId);
+                ModLock? modLock = settings.ModlistLock.FirstOrDefault(v => v.Id == modId);
                 if (modLock is not null)
                 {
                     string file = Path.GetFullPath(Path.Combine(settings.ModsDirectory, modLock.FileName));
-                    unsupportedMods.Add(new ModUninstall()
+                    unsupportedMods.Add(new ModUninstallInfo()
                     {
-                        Reason = ModUninstallReason.Because,
+                        Reason = ModUninstallReason.NotSupported,
                         LockEntry = modLock,
                         File = File.Exists(file) ? file : null,
                     });
@@ -82,22 +82,3 @@ public static class Update
         return (modUpdates, unsupportedMods);
     }
 }
-
-public enum ModUpdateReason
-{
-    NewVersion,
-    HashChanged,
-    NotInstalled,
-    InvalidHash,
-}
-
-public class ModUpdate : ModDownloadInfo
-{
-    public required ModUpdateReason Reason { get; init; }
-}
-
-public class ModUninstall : ModUninstallInfo
-{
-    public required ModUninstallReason Reason { get; init; }
-}
-

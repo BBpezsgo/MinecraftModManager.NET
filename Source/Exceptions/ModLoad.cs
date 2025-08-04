@@ -1,9 +1,3 @@
 namespace MMM;
 
-public class ModLoadException : ApplicationException
-{
-    public ModLoadException(string message, Exception? inner = null) : base(message, inner)
-    {
-
-    }
-}
+public class ModLoadException(string message, Exception? inner = null) : ApplicationException(message, inner);

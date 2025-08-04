@@ -4,7 +4,7 @@ public static class Program
 {
     public static void Main(string[] args)
     {
-        if (!File.Exists(Settings.ModlistPath))
+        if (!File.Exists(Context.ModlistPath))
         {
             Log.Error($"No package.json found");
             return;
@@ -12,6 +12,7 @@ public static class Program
 
         if (args.Length == 0)
         {
+            Log.Error($"No arguments passed");
             return;
         }
 
@@ -89,11 +90,11 @@ public static class Program
             {
                 Thread.Yield();
             }
-        }
 
-        if (task.Exception is not null)
-        {
-            Log.Error(task.Exception);
+            if (task.Exception is not null)
+            {
+                Log.Error(task.Exception);
+            }
         }
     }
 }

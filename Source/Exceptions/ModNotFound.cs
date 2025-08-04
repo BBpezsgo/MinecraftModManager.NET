@@ -1,9 +1,3 @@
 namespace MMM;
 
-public class ModNotFoundException : ApplicationException
-{
-    public ModNotFoundException(string message, Exception? inner = null) : base(message, inner)
-    {
-
-    }
-}
+public class ModNotFoundException(string message, Exception? inner = null) : ApplicationException(message, inner);

@@ -1,4 +1,3 @@
-using System.Runtime.Serialization;
 using Modrinth;
 
 namespace MMM.Actions;
@@ -7,8 +6,8 @@ public static class Remove
 {
     public static async Task PerformRemove(string modName, CancellationToken ct)
     {
-        ModrinthClient client = new(Settings.ModrinthClientConfig);
-        Settings settings = Settings.Create();
+        ModrinthClient client = new(Context.ModrinthClientConfig);
+        Context settings = Context.Create();
 
         string? modId = await settings.GetModId(modName, ct);
         ModEntry? mod = settings.Modlist.Mods.FirstOrDefault(v => v.Id == modId);
@@ -25,7 +24,7 @@ public static class Remove
         if (usedBy.Count > 0)
         {
             Log.Error($"Mod {modlock.Name ?? modName} is used by the following mod(s):");
-            foreach (var item in usedBy)
+            foreach (ModLock item in usedBy)
             {
                 Log.None(item.Name ?? item.FileName ?? item.Id);
             }
@@ -44,8 +43,8 @@ public static class Remove
 
         settings.Modlist.Mods.Remove(mod);
 
-        var (updates, uninstalls) = await Install.CheckChanges(settings, client, ct);
+        (List<ModDownloadInfo> updates, List<ModUninstallInfo> uninstalls) = await ModInstaller.CheckChanges(settings, client, ct);
 
-        await Install.PerformChanges(settings, updates, uninstalls, ct);
+        await ModInstaller.PerformChanges(settings, updates, uninstalls, ct);
     }
 }

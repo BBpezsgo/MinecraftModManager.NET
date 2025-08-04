@@ -5,14 +5,14 @@ using MMM.Fabric;
 
 namespace MMM;
 
-public static class InstalledMods
+public static class ModReader
 {
-    public static async Task<FabricMod> ReadMod(ZipArchive archive, string filename, CancellationToken ct)
+    static async Task<FabricMod> ReadMod(ZipArchive archive, string filename, CancellationToken ct)
     {
         string text;
 
         {
-            var fabricMod = archive.GetEntry("fabric.mod.json") ?? throw new ModLoadException($"File {Path.GetFileName(filename)} is not a fabric mod");
+            ZipArchiveEntry fabricMod = archive.GetEntry("fabric.mod.json") ?? throw new ModLoadException($"File {Path.GetFileName(filename)} is not a fabric mod");
             using Stream stream = await fabricMod.OpenAsync(ct);
             using StreamReader reader = new(stream);
             text = reader.ReadToEnd();
@@ -31,7 +31,11 @@ public static class InstalledMods
     static async Task ReadMod(ZipArchive archive, string filename, ImmutableArray<InstalledMod>.Builder result, CancellationToken ct)
     {
         FabricMod content = await ReadMod(archive, filename, ct);
-        result.Add(new InstalledMod(filename, content));
+        result.Add(new InstalledMod()
+        {
+            FileName = filename,
+            Mod = content,
+        });
 
         if (content.Jars is not null)
         {
@@ -53,34 +57,22 @@ public static class InstalledMods
         }
     }
 
-    static async Task ReadMod(string file, ImmutableArray<InstalledMod>.Builder result, CancellationToken ct)
-    {
-        try
-        {
-            using ZipArchive archive = await ZipFile.OpenReadAsync(file, ct);
-            await ReadMod(archive, file, result, ct);
-        }
-        catch (InvalidDataException ex)
-        {
-            throw new ModLoadException($"Invalid mod file", ex);
-        }
-    }
-
     public static async Task<ImmutableArray<InstalledMod>> ReadMods(string directory, CancellationToken ct)
     {
         if (!Directory.Exists(directory)) return [];
 
         ImmutableArray<InstalledMod>.Builder installedMods = ImmutableArray.CreateBuilder<InstalledMod>();
 
-        foreach (string v in Directory.GetFiles(directory, "*.jar"))
+        foreach (string file in Directory.GetFiles(directory, "*.jar"))
         {
             try
             {
-                await ReadMod(v, installedMods, ct);
+                using ZipArchive archive = await ZipFile.OpenReadAsync(file, ct);
+                await ReadMod(archive, file, installedMods, ct);
             }
-            catch (ModLoadException ex)
+            catch (InvalidDataException ex)
             {
-                Log.Error(ex);
+                Log.Error(new ModLoadException($"Invalid mod file", ex));
             }
         }
 

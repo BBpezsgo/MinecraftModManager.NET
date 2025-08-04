@@ -9,11 +9,11 @@ public class ProgressBar : IDisposable, IProgress<float>
     readonly Timer Timer;
     readonly Lock Lock;
 
-    float Progress = 0;
+    float Progress;
     string Title = string.Empty;
 
-    bool IsDisposed = false;
-    LogEntry LastLine = default;
+    bool IsDisposed;
+    LogEntry LastLine;
 
     public ProgressBar()
     {
@@ -85,10 +85,7 @@ public class ProgressBar : IDisposable, IProgress<float>
         }
     }
 
-    void ResetTimer()
-    {
-        Timer.Change(AnimationInterval, TimeSpan.FromMilliseconds(-1));
-    }
+    void ResetTimer() => Timer.Change(AnimationInterval, TimeSpan.FromMilliseconds(-1));
 
     public void Dispose()
     {

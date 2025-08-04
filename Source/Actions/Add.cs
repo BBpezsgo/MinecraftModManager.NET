@@ -6,8 +6,8 @@ public static class Add
 {
     public static async Task PerformAdd(string query, CancellationToken ct)
     {
-        ModrinthClient client = new(Settings.ModrinthClientConfig);
-        Settings settings = Settings.Create();
+        ModrinthClient client = new(Context.ModrinthClientConfig);
+        Context settings = Context.Create();
 
         if (settings.Modlist.Mods.Any(v => v.Id == query) &&
             settings.ModlistLock.Any(v => v.Id == query))
@@ -16,7 +16,7 @@ public static class Add
             return;
         }
 
-        (string? id, string? name) = await Install.FindModOnline(query, client, ct);
+        (string? id, string? name) = await ModrinthUtils.FindModOnline(query, client, ct);
 
         if (id is null) return;
 
@@ -30,11 +30,11 @@ public static class Add
         settings.Modlist.Mods.Add(new ModEntry()
         {
             Id = id,
-            Name = query,
+            Name = name,
         });
 
-        var (updates, uninstalls) = await Install.CheckChanges(settings, client, ct);
+        (List<ModDownloadInfo> updates, List<ModUninstallInfo> uninstalls) = await ModInstaller.CheckChanges(settings, client, ct);
 
-        await Install.PerformChanges(settings, updates, uninstalls, ct);
+        await ModInstaller.PerformChanges(settings, updates, uninstalls, ct);
     }
 }

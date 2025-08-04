@@ -40,8 +40,11 @@ readonly struct LogEntry(string text) : IAdditionOperators<LogEntry, LogEntry, L
 
     public override string ToString() => _text;
 
-    public bool Equals(LogEntry other) => string.Equals(_text, other._text);
+    public bool Equals(LogEntry other) => string.Equals(_text, other._text, StringComparison.Ordinal);
+    public override bool Equals(object? obj) => obj is LogEntry other && Equals(other);
 
     public static implicit operator string(LogEntry v) => v._text ?? string.Empty;
     public static implicit operator LogEntry(string? v) => new(v ?? string.Empty);
+
+    public override int GetHashCode() => _text.GetHashCode();
 }

@@ -96,9 +96,9 @@ public enum VersionOperator
 
 public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
 {
-    public readonly VersionOperator Operator;
-    public readonly PartialSemanticVersion? Version;
-    public readonly string Raw;
+    public VersionOperator Operator { get; }
+    public PartialSemanticVersion? Version { get; }
+    public string Raw { get; }
 
     public SingleVersionRange(string value)
     {
@@ -109,12 +109,12 @@ public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
             Operator = VersionOperator.Equal;
             Raw = value = value[1..];
         }
-        else if (value.StartsWith(">="))
+        else if (value.StartsWith(">=", StringComparison.Ordinal))
         {
             Operator = VersionOperator.GreaterEqual;
             Raw = value = value[2..];
         }
-        else if (value.StartsWith("<="))
+        else if (value.StartsWith("<=", StringComparison.Ordinal))
         {
             Operator = VersionOperator.LessEqual;
             Raw = value = value[2..];
@@ -145,7 +145,7 @@ public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
             Raw = value;
         }
 
-        Version = PartialSemanticVersion.TryParse(value, out var v) ? v : null;
+        Version = PartialSemanticVersion.TryParse(value, out PartialSemanticVersion v) ? v : null;
     }
 
     public override string ToString() => Raw == "*" ? Raw : $"{Operator switch
@@ -195,7 +195,7 @@ public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
     {
         if (Raw == "*") return true;
         if (!Version.HasValue) return false;
-        if (!SemanticVersion.TryParse(version, out var sversion)) return false;
+        if (!SemanticVersion.TryParse(version, out SemanticVersion sversion)) return false;
         return Satisfies(sversion);
     }
 }
@@ -208,8 +208,8 @@ public enum VersionListOperator
 
 public class ListedVersionRange(VersionListOperator @operator, ImmutableArray<SingleVersionRange> values) : VersionRange, IEquatable<ListedVersionRange>
 {
-    public readonly VersionListOperator Operator = @operator;
-    public readonly ImmutableArray<SingleVersionRange> Values = values;
+    public VersionListOperator Operator { get; } = @operator;
+    public ImmutableArray<SingleVersionRange> Values { get; } = values;
 
     public override string ToString() => $"[ {string.Join(" ", Values.Select(v => v.ToString()))} ]";
     public bool Equals(ListedVersionRange? other)

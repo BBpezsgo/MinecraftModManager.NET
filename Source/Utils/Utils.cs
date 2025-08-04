@@ -53,8 +53,14 @@ public static class Utils
 
             if (inString)
             {
-                if (c == '\n') builder.Append("\\n");
-                else if (c == '\r') builder.Append("\\r");
+                if (c == '\n')
+                {
+                    builder.Append("\\n");
+                }
+                else if (c == '\r')
+                {
+                    builder.Append("\\r");
+                }
                 else if (c == '\\')
                 {
                     escapeNext = true;

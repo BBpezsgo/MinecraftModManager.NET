@@ -2,7 +2,7 @@ namespace MMM;
 
 static partial class Log
 {
-    static LogEntry LastLogEntry = default;
+    static LogEntry LastLogEntry;
     public static List<Lock> InteractiveLocks = [];
 
     readonly struct AutoScope : IDisposable
@@ -33,15 +33,9 @@ static partial class Log
         LastLogEntry = logEntry;
     }
 
-    public static void Rekeep(LogEntry logEntry)
-    {
-        LastLogEntry = logEntry;
-    }
+    public static void Rekeep(LogEntry logEntry) => LastLogEntry = logEntry;
 
-    public static void Unkeep()
-    {
-        LastLogEntry = default;
-    }
+    public static void Unkeep() => LastLogEntry = default;
 
     public static LogEntry Write(string? text)
     {
@@ -182,7 +176,7 @@ static partial class Log
                 }
                 else
                 {
-                    foreach (var item in aggregateException.InnerExceptions)
+                    foreach (Exception item in aggregateException.InnerExceptions)
                     {
                         _(item, depth++);
                     }
