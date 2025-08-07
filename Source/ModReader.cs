@@ -20,7 +20,7 @@ public static class ModReader
 
         try
         {
-            return JsonSerializer.Deserialize<FabricMod>(Utils.SanitizeJson(text), FabricModJsonSerializerContext.Default.FabricMod)!;
+            return JsonSerializer.Deserialize(Utils.SanitizeJson(text), FabricModJsonSerializerContext.Default.FabricMod)!;
         }
         catch (JsonException e)
         {

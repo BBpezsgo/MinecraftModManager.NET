@@ -3,12 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace MMM.Fabric;
 
-[JsonSerializable(typeof(FabricMod))]
-public partial class FabricModJsonSerializerContext : JsonSerializerContext
-{
-
-}
-
 public class GenericComponent
 {
     [JsonPropertyName("id")] public required string Id { get; init; }

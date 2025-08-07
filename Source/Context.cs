@@ -40,10 +40,10 @@ public class Context
             List<ModLock> modlistLock = [];
             if (File.Exists(ModlistLockPath))
             {
-                modlistLock = JsonSerializer.Deserialize<List<ModLock>>(File.ReadAllText(ModlistLockPath)) ?? throw new JsonException();
+                modlistLock = JsonSerializer.Deserialize(File.ReadAllText(ModlistLockPath), ModLockListJsonSerializerContext.Default.ListModLock) ?? throw new JsonException();
             }
 
-            ModList modlist = JsonSerializer.Deserialize<ModList>(File.ReadAllText(ModlistPath)) ?? throw new JsonException();
+            ModList modlist = JsonSerializer.Deserialize(File.ReadAllText(ModlistPath), ModListJsonSerializerContext.Default.ModList) ?? throw new JsonException();
 
             return _instance = new Context
             {
