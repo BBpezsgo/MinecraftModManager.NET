@@ -1,17 +1,12 @@
-using Modrinth;
-
 namespace MMM.Actions;
 
 public static class Remove
 {
     public static async Task PerformRemove(string modName, CancellationToken ct)
     {
-        ModrinthClient client = new(Context.ModrinthClientConfig);
-        Context settings = Context.Create();
-
-        string? modId = await settings.GetModId(modName, ct);
-        ModEntry? mod = settings.Modlist.Mods.FirstOrDefault(v => v.Id == modId);
-        ModLock? modlock = settings.ModlistLock.FirstOrDefault(v => v.Id == modId);
+        string? modId = await Context.Instance.GetModId(modName, ct);
+        ModEntry? mod = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == modId);
+        ModLock? modlock = Context.Instance.ModlistLock.FirstOrDefault(v => v.Id == modId);
 
         if (modlock is null)
         {
@@ -19,7 +14,7 @@ public static class Remove
             return;
         }
 
-        List<ModLock> usedBy = [.. settings.ModlistLock.Where(v => v.Dependencies.Contains(modlock.Id))];
+        List<ModLock> usedBy = [.. Context.Instance.ModlistLock.Where(v => v.Dependencies.Contains(modlock.Id))];
 
         if (usedBy.Count > 0)
         {
@@ -41,10 +36,10 @@ public static class Remove
             return;
         }
 
-        settings.Modlist.Mods.Remove(mod);
+        Context.Instance.Modlist.Mods.Remove(mod);
 
-        (List<ModDownloadInfo> updates, List<ModUninstallInfo> uninstalls) = await ModInstaller.CheckChanges(settings, client, ct);
+        (List<ModDownloadInfo> updates, List<ModUninstallInfo> uninstalls) = await ModInstaller.CheckChanges(ct);
 
-        await ModInstaller.PerformChanges(settings, updates, uninstalls, ct);
+        await ModInstaller.PerformChanges(updates, uninstalls, ct);
     }
 }

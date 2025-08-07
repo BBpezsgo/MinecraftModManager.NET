@@ -1,18 +1,17 @@
 using System.Buffers;
-using Modrinth;
 using Modrinth.Exceptions;
 
 namespace MMM;
 
 static class ModrinthUtils
 {
-    public static async Task<(string? Id, string? Name)> FindModOnline(string query, ModrinthClient client, CancellationToken ct)
+    public static async Task<(string? Id, string? Name)> FindModOnline(string query, CancellationToken ct)
     {
         if (IsModrinthId(query))
         {
             try
             {
-                Modrinth.Models.Project project = await client.Project.GetAsync(query, ct);
+                Modrinth.Models.Project project = await Context.Modrinth.Project.GetAsync(query, ct);
                 return (project.Id, project.Title);
             }
             catch (ModrinthApiException)
@@ -21,7 +20,7 @@ static class ModrinthUtils
             }
         }
 
-        Modrinth.Models.SearchResult? result = (await client.Project.SearchAsync(
+        Modrinth.Models.SearchResult? result = (await Context.Modrinth.Project.SearchAsync(
             query.Replace('-', ' '),
             Modrinth.Models.Enums.Index.Downloads,
             0,
@@ -56,15 +55,15 @@ static class ModrinthUtils
 
     public static bool IsModrinthId(string value) => value.Length == 8 && value.All(ModrinthIdSearch.Contains);
 
-    public static async Task<ModDownloadInfo> GetModDownload(string id, Context settings, ModrinthClient client, CancellationToken ct)
+    public static async Task<ModDownloadInfo> GetModDownload(string id, CancellationToken ct)
     {
         Modrinth.Models.Version[] versions;
         try
         {
-            versions = await client.Version.GetProjectVersionListAsync(
+            versions = await Context.Modrinth.Version.GetProjectVersionListAsync(
                 id,
-                [settings.Modlist.Loader],
-                [settings.Modlist.GameVersion],
+                [Context.Instance.Modlist.Loader],
+                [Context.Instance.Modlist.GameVersion],
                 null,
                 ct
             );
@@ -87,8 +86,8 @@ static class ModrinthUtils
 
         foreach (Modrinth.Models.Version version in versions)
         {
-            if (!version.GameVersions.Contains(settings.Modlist.GameVersion)) continue;
-            if (!version.Loaders.Contains(settings.Modlist.Loader)) continue;
+            if (!version.GameVersions.Contains(Context.Instance.Modlist.GameVersion)) continue;
+            if (!version.Loaders.Contains(Context.Instance.Modlist.Loader)) continue;
 
             Modrinth.Models.File? file =
                 version.Files.FirstOrDefault(v => v.Primary)
@@ -108,12 +107,12 @@ static class ModrinthUtils
                 continue;
             }
 
-            ModLock? lockfileEntry = settings.ModlistLock.FirstOrDefault(v => v.Id == id);
+            ModLock? lockfileEntry = Context.Instance.ModlistLock.FirstOrDefault(v => v.Id == id);
 
             return new ModDownloadInfo()
             {
                 Reason = ModUpdateReason.Because,
-                Mod = settings.Modlist.Mods.FirstOrDefault(v => v.Id == id) ?? new ModEntry() { Id = id },
+                Mod = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == id) ?? new ModEntry() { Id = id },
                 File = file,
                 Version = version,
                 LockEntry = lockfileEntry,
@@ -121,12 +120,12 @@ static class ModrinthUtils
             };
         }
 
-        throw new ModNotSupported($"Mod {settings.GetModName(id) ?? id} not supported");
+        throw new ModNotSupported($"Mod {Context.Instance.GetModName(id) ?? id} not supported");
     }
 
-    public static async Task<ModDownloadInfo?> GetModIfNeeded(string id, Context settings, ModrinthClient client, CancellationToken ct)
+    public static async Task<ModDownloadInfo?> GetModIfNeeded(string id, CancellationToken ct)
     {
-        ModDownloadInfo downloadInfo = await GetModDownload(id, settings, client, ct);
+        ModDownloadInfo downloadInfo = await GetModDownload(id, ct);
 
         bool needsDownload = false;
         ModUpdateReason reason = default;
@@ -151,7 +150,7 @@ static class ModrinthUtils
             ? new ModDownloadInfo()
             {
                 Reason = reason,
-                Mod = settings.Modlist.Mods.FirstOrDefault(v => v.Id == id) ?? new ModEntry() { Id = id },
+                Mod = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == id) ?? new ModEntry() { Id = id },
                 DownloadFileName = downloadInfo.DownloadFileName,
                 File = downloadInfo.File,
                 LockEntry = downloadInfo.LockEntry,

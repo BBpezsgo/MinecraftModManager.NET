@@ -1,19 +1,18 @@
 using System.Collections.Immutable;
-using Modrinth;
 
 namespace MMM.Actions;
 
 public static class Check
 {
-    static async Task PrintLockFileErrors(string modsDirectory, List<ModLock> modlistLock, CancellationToken ct)
+    static async Task PrintLockFileErrors(Context context, CancellationToken ct)
     {
         List<InstalledComponent> installedMods = [];
 
         ProgressBar progressBar = new();
 
-        if (Directory.Exists(modsDirectory))
+        if (Directory.Exists(context.ModsDirectory))
         {
-            string[] array = Directory.GetFiles(modsDirectory, "*.jar");
+            string[] array = Directory.GetFiles(context.ModsDirectory, "*.jar");
             for (int i = 0; i < array.Length; i++)
             {
                 string file = array[i];
@@ -22,7 +21,7 @@ public static class Check
 
                 string hash = await Utils.ComputeHash1(file, ct);
 
-                ModLock? lockEntry = modlistLock.FirstOrDefault(v => v.FileName == Path.GetFileName(file));
+                ModLock? lockEntry = context.ModlistLock.FirstOrDefault(v => v.FileName == Path.GetFileName(file));
 
                 if (lockEntry is null)
                 {
@@ -38,13 +37,13 @@ public static class Check
             }
         }
 
-        for (int i = 0; i < modlistLock.Count; i++)
+        for (int i = 0; i < context.ModlistLock.Count; i++)
         {
-            ModLock lockEntry = modlistLock[i];
+            ModLock lockEntry = context.ModlistLock[i];
 
-            progressBar.Report(lockEntry.Name ?? lockEntry.Id, i, modlistLock.Count);
+            progressBar.Report(lockEntry.Name ?? lockEntry.Id, i, context.ModlistLock.Count);
 
-            string file = Path.GetFullPath(Path.Combine(modsDirectory, lockEntry.FileName));
+            string file = context.GetModPath(lockEntry);
 
             if (!File.Exists(file))
             {
@@ -58,28 +57,24 @@ public static class Check
 
     public static async Task PerformCheck(CancellationToken ct)
     {
-        Context settings = Context.Create();
-
         Log.Section($"Performing checks");
 
         Log.MajorAction($"Checking lockfile");
 
-        await PrintLockFileErrors(settings.ModsDirectory, settings.ModlistLock, ct);
+        await PrintLockFileErrors(Context.Instance, ct);
 
         Log.MajorAction($"Checking dependencies");
-        (ImmutableArray<DependencyError> errors, _) = await DependencyResolution.CheckDependencies(settings, false, ct);
-
-        ModrinthClient client = new(Context.ModrinthClientConfig);
+        (ImmutableArray<DependencyError> errors, _) = await DependencyResolution.CheckDependencies(Context.Instance, false, ct);
 
         foreach (DependencyError error in errors)
         {
             if (error.Level == DependencyErrorLevel.Depends)
             {
-                (string? id, string? name) = await ModrinthUtils.FindModOnline(error.OtherId, client, ct);
+                (string? id, string? name) = await ModrinthUtils.FindModOnline(error.OtherId, ct);
 
                 if (id is null) continue;
 
-                settings.Modlist.Mods.Add(new ModEntry()
+                Context.Instance.Modlist.Mods.Add(new ModEntry()
                 {
                     Id = id,
                     Name = name,
@@ -87,8 +82,8 @@ public static class Check
             }
         }
 
-        (List<ModDownloadInfo> updates, List<ModUninstallInfo> uninstalls) = await ModInstaller.CheckChanges(settings, client, ct);
+        (List<ModDownloadInfo> updates, List<ModUninstallInfo> uninstalls) = await ModInstaller.CheckChanges(ct);
 
-        await ModInstaller.PerformChanges(settings, updates, uninstalls, ct);
+        await ModInstaller.PerformChanges(updates, uninstalls, ct);
     }
 }

@@ -17,38 +17,46 @@ public class Context
     public static readonly string ModlistPath = Path.Combine(MinecraftPath, "modlist.json");
     public static readonly string ModlistLockPath = Path.Combine(MinecraftPath, "modlist-lock.json");
 
-    public static readonly ModrinthClientConfig ModrinthClientConfig = new()
-    {
-        UserAgent = Project.UserAgent,
-    };
-
     public required ModList Modlist { get; init; }
     public required List<ModLock> ModlistLock { get; init; }
     public string ModsDirectory => Path.GetFullPath(Path.Combine(MinecraftPath, Modlist.ModsFolder));
 
     ImmutableArray<InstalledMod> _mods;
 
+    static ModrinthClient? _modrinthClient;
+    public static ModrinthClient Modrinth => _modrinthClient ??= new ModrinthClient(new ModrinthClientConfig()
+    {
+        UserAgent = Project.UserAgent,
+    });
+
+    static Context? _instance;
+
+    public static Context Instance
+    {
+        get
+        {
+            if (_instance is not null) return _instance;
+
+            List<ModLock> modlistLock = [];
+            if (File.Exists(ModlistLockPath))
+            {
+                modlistLock = JsonSerializer.Deserialize<List<ModLock>>(File.ReadAllText(ModlistLockPath)) ?? throw new JsonException();
+            }
+
+            ModList modlist = JsonSerializer.Deserialize<ModList>(File.ReadAllText(ModlistPath)) ?? throw new JsonException();
+
+            return _instance = new Context
+            {
+                Modlist = modlist,
+                ModlistLock = modlistLock,
+            };
+        }
+    }
+
     public async Task<ImmutableArray<InstalledMod>> GetMods(CancellationToken ct)
     {
         if (!_mods.IsDefault) return _mods;
         return _mods = await ModReader.ReadMods(ModsDirectory, ct);
-    }
-
-    public static Context Create()
-    {
-        List<ModLock> modlistLock = [];
-        if (File.Exists(ModlistLockPath))
-        {
-            modlistLock = JsonSerializer.Deserialize<List<ModLock>>(File.ReadAllText(ModlistLockPath)) ?? throw new JsonException();
-        }
-
-        ModList modlist = JsonSerializer.Deserialize<ModList>(File.ReadAllText(ModlistPath)) ?? throw new JsonException();
-
-        return new Context
-        {
-            Modlist = modlist,
-            ModlistLock = modlistLock,
-        };
     }
 
     public string? GetModName(string? id)
@@ -93,6 +101,8 @@ public class Context
 
         return null;
     }
+
+    public string GetModPath(ModLock modLock) => Path.GetFullPath(Path.Combine(ModsDirectory, modLock.FileName));
 }
 
 public readonly struct InstalledComponent
