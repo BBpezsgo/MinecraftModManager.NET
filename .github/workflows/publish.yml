@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  DOTNET_VERSION: '10.0.0'
+  DOTNET_VERSION: '10.x'
 
 jobs:
 
