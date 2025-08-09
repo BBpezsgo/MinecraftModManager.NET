@@ -24,11 +24,10 @@ jobs:
       
     - name: Build
       run: |
-        cd mmm
-        dotnet publish -c Release -o ../publish/linux-x64 -r linux-x64 /p:UseAppHost=true
-        dotnet publish -c Release -o ../publish/win-x64 -r win-x64 /p:UseAppHost=true
-        mv ../publish/linux-x64/mmm ../publish/linux-x64/mmm-linux-x64
-        mv ../publish/win-x64/mmm ../publish/win-x64/mmm-win-x64
+        dotnet publish -c Release -o ./publish/linux-x64 -r linux-x64 /p:UseAppHost=true
+        dotnet publish -c Release -o ./publish/win-x64 -r win-x64 /p:UseAppHost=true
+        mv ./publish/linux-x64/mmm ./publish/linux-x64/mmm-linux-x64
+        mv ./publish/win-x64/mmm ./publish/win-x64/mmm-win-x64
 
     - name: Get current date
       id: date
