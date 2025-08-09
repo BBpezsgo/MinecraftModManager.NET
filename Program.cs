@@ -44,22 +44,22 @@ public static class Program
                 task = Actions.Check.PerformCheck(cts.Token);
                 break;
             case "add":
-                if (args.Length != 2)
+                if (args.Length < 2)
                 {
                     Log.Error($"Wrong number of arguments passed");
                     return;
                 }
 
-                task = Actions.Add.PerformAdd(args[1], cts.Token);
+                task = Actions.Add.PerformAdd(args[1..], cts.Token);
                 break;
             case "remove":
-                if (args.Length != 2)
+                if (args.Length < 2)
                 {
                     Log.Error($"Wrong number of arguments passed");
                     return;
                 }
 
-                task = Actions.Remove.PerformRemove(args[1], cts.Token);
+                task = Actions.Remove.PerformRemove(args[1..], cts.Token);
                 break;
             case "list":
                 if (args.Length != 1)

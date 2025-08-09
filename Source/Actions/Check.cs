@@ -82,8 +82,8 @@ public static class Check
             }
         }
 
-        (List<ModDownloadInfo> updates, List<ModUninstallInfo> uninstalls) = await ModInstaller.CheckChanges(ct);
+        Changes changes = await ModInstaller.CheckChanges(ct);
 
-        await ModInstaller.PerformChanges(updates, uninstalls, ct);
+        await ModInstaller.PerformChanges(changes, ct);
     }
 }

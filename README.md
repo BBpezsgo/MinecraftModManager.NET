@@ -28,6 +28,10 @@ Convinient command line mod manager for Minecraft using Modrinth.
 
 > You can get the Modrinth id of a mod by going to the mod's page, clicking on the three dots (top right) and clicking "Copy ID".
 
+## Known Issues
+
+- When you use `mmm change`, it doesn't remove the unsupported mods from the listfile. (I mean it's fine, idk if I should fix it or not because it works)
+
 ## TODO
 
 - Check for conflicts when adding/removing/updating a mod. (WIP)

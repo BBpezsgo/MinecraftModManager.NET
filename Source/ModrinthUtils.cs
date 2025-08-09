@@ -55,7 +55,7 @@ static class ModrinthUtils
 
     public static bool IsModrinthId(string value) => value.Length == 8 && value.All(ModrinthIdSearch.Contains);
 
-    public static async Task<ModDownloadInfo> GetModDownload(string id, CancellationToken ct)
+    public static async Task<ModInstallInfo> GetModDownload(string id, CancellationToken ct)
     {
         Modrinth.Models.Version[] versions;
         try
@@ -109,7 +109,7 @@ static class ModrinthUtils
 
             ModLock? lockfileEntry = Context.Instance.ModlistLock.FirstOrDefault(v => v.Id == id);
 
-            return new ModDownloadInfo()
+            return new ModInstallInfo()
             {
                 Reason = ModUpdateReason.Because,
                 Mod = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == id) ?? new ModEntry() { Id = id },
@@ -123,9 +123,9 @@ static class ModrinthUtils
         throw new ModNotSupported($"Mod {Context.Instance.GetModName(id) ?? id} not supported");
     }
 
-    public static async Task<ModDownloadInfo?> GetModIfNeeded(string id, CancellationToken ct)
+    public static async Task<ModInstallInfo?> GetModIfNeeded(string id, CancellationToken ct)
     {
-        ModDownloadInfo downloadInfo = await GetModDownload(id, ct);
+        ModInstallInfo downloadInfo = await GetModDownload(id, ct);
 
         bool needsDownload = false;
         ModUpdateReason reason = default;
@@ -147,7 +147,7 @@ static class ModrinthUtils
         }
 
         return needsDownload
-            ? new ModDownloadInfo()
+            ? new ModInstallInfo()
             {
                 Reason = reason,
                 Mod = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == id) ?? new ModEntry() { Id = id },

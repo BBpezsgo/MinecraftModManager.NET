@@ -1,6 +1,6 @@
 namespace MMM;
 
-public class ModDownloadInfo
+public class ModInstallInfo
 {
     public required ModUpdateReason Reason { get; init; }
     public required Modrinth.Models.Version Version { get; init; }

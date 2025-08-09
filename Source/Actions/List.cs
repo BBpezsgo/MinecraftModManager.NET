@@ -2,7 +2,7 @@ namespace MMM.Actions;
 
 public static class List
 {
-    public static async Task PerformList(CancellationToken ct)
+    public static Task PerformList(CancellationToken ct) => Task.Run(() =>
     {
         Log.MajorAction("Reading mods");
 
@@ -33,5 +33,5 @@ public static class List
 
             Log.NewLine();
         }
-    }
+    }, ct);
 }

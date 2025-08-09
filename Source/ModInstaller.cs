@@ -6,12 +6,12 @@ namespace MMM;
 
 public static class ModInstaller
 {
-    public static async Task<(List<ModDownloadInfo> Updates, List<ModUninstallInfo> Uninstalls)> CheckChanges(CancellationToken ct)
+    public static async Task<Changes> CheckChanges(CancellationToken ct)
     {
         Log.Section($"Checking for changes");
 
-        List<ModDownloadInfo> modUpdates = [];
-        List<ModUninstallInfo> modUninstalls = [];
+        ImmutableArray<ModInstallInfo>.Builder modUpdates = ImmutableArray.CreateBuilder<ModInstallInfo>();
+        ImmutableArray<ModUninstallInfo>.Builder modUninstalls = ImmutableArray.CreateBuilder<ModUninstallInfo>();
 
         {
             Log.MinorAction($"Checking for new mods");
@@ -37,7 +37,7 @@ public static class ModInstaller
 
                     progressBar.Report(mod.Name ?? mod.Id, i, fetchThese.Count);
 
-                    ModDownloadInfo? update;
+                    ModInstallInfo? update;
 
                     try
                     {
@@ -51,7 +51,7 @@ public static class ModInstaller
 
                     if (update is null) continue;
 
-                    modUpdates.Add(new ModDownloadInfo()
+                    modUpdates.Add(new ModInstallInfo()
                     {
                         Reason = reason,
                         Mod = mod,
@@ -176,7 +176,11 @@ public static class ModInstaller
             }
         }
 
-        return (modUpdates, modUninstalls);
+        return new Changes()
+        {
+            Install = modUpdates.ToImmutable(),
+            Uninstall = modUninstalls.ToImmutable(),
+        };
     }
 
     static async Task<(bool NeedsDownload, ModUpdateReason Reason)> IsNeeded(ModEntry mod, CancellationToken ct)
@@ -202,7 +206,7 @@ public static class ModInstaller
         return (false, default);
     }
 
-    public static async Task DownloadMod(ModDownloadInfo info, CancellationToken ct)
+    public static async Task DownloadMod(ModInstallInfo info, CancellationToken ct)
     {
         if (!Directory.Exists(Context.Instance.ModsDirectory))
         {
@@ -274,12 +278,12 @@ public static class ModInstaller
         }
     }
 
-    public static async Task PerformChanges(List<ModDownloadInfo> modUpdates, List<ModUninstallInfo> modUninstalls, CancellationToken ct)
+    public static async Task PerformChanges(Changes changes, CancellationToken ct)
     {
         ImmutableArray<InstalledMod> mods = await Context.Instance.GetMods(ct);
 
         {
-            string GetName1(ModDownloadInfo update)
+            string GetName1(ModInstallInfo update)
             {
                 return Context.Instance.GetModName(update.Mod.Id) ??
                     $"{update.LockEntry?.Name ?? update.DownloadFileName} ({update.Mod.Id})";
@@ -294,18 +298,18 @@ public static class ModInstaller
             }
 
             int nameMaxWidth = 0;
-            nameMaxWidth = modUpdates.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, GetName1(v).Length));
-            nameMaxWidth = modUninstalls.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, GetName2(v).Length));
+            nameMaxWidth = changes.Install.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, GetName1(v).Length));
+            nameMaxWidth = changes.Uninstall.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, GetName2(v).Length));
             nameMaxWidth += 2;
 
-            if (modUpdates.Count > 0 || modUninstalls.Count > 0)
+            if (!changes.IsEmpty)
             {
                 Console.WriteLine();
             }
 
             nameMaxWidth = Math.Clamp(nameMaxWidth, 4, Console.WindowWidth * 2 / 3);
 
-            foreach (ModDownloadInfo update in modUpdates)
+            foreach (ModInstallInfo update in changes.Install)
             {
                 string name = GetName1(update);
 
@@ -389,7 +393,7 @@ public static class ModInstaller
                 Console.WriteLine();
             }
 
-            foreach (ModUninstallInfo uninstall in modUninstalls)
+            foreach (ModUninstallInfo uninstall in changes.Uninstall)
             {
                 string name = GetName2(uninstall);
 
@@ -410,7 +414,7 @@ public static class ModInstaller
             }
         }
 
-        if (modUpdates.Count == 0 && modUninstalls.Count == 0)
+        if (changes.IsEmpty)
         {
             Log.Info($"No actions have to be done");
         }
@@ -422,20 +426,20 @@ public static class ModInstaller
 
                 ProgressBar progressBar = new();
 
-                for (int i = 0; i < modUpdates.Count; i++)
+                for (int i = 0; i < changes.Install.Length; i++)
                 {
-                    ModDownloadInfo update = modUpdates[i];
+                    ModInstallInfo update = changes.Install[i];
 
-                    progressBar.Report(update.LockEntry?.Name ?? update.Mod.Id, i, modUpdates.Count);
+                    progressBar.Report(update.LockEntry?.Name ?? update.Mod.Id, i, changes.Install.Length);
 
                     await DownloadMod(update, ct);
                 }
 
                 progressBar.Dispose();
 
-                for (int i = 0; i < modUninstalls.Count; i++)
+                for (int i = 0; i < changes.Uninstall.Length; i++)
                 {
-                    ModUninstallInfo uninstall = modUninstalls[i];
+                    ModUninstallInfo uninstall = changes.Uninstall[i];
 
                     UninstallMod(uninstall);
                     await File.WriteAllTextAsync(Context.ModlistLockPath, JsonSerializer.Serialize(Context.Instance.ModlistLock, ModLockListJsonSerializerContext.Default.ListModLock), ct);

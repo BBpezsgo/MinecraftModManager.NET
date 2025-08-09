@@ -6,8 +6,8 @@ public static class Change
     {
         Context.Instance.Modlist.GameVersion = targetVersion;
 
-        (List<ModDownloadInfo> modUpdates, List<ModUninstallInfo> unsupported) = await Update.CheckNewVersions(ct);
+        Changes changes = await Update.CheckNewVersions(ct);
 
-        await ModInstaller.PerformChanges(modUpdates, unsupported, ct);
+        await ModInstaller.PerformChanges(changes, ct);
     }
 }

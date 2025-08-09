@@ -6,14 +6,15 @@ public static class Update
 {
     public static async Task PerformUpdate(CancellationToken ct)
     {
-        (List<ModDownloadInfo> modUpdates, List<ModUninstallInfo> unsupported) = await CheckNewVersions(ct);
+        Changes changes = await CheckNewVersions(ct);
 
-        await ModInstaller.PerformChanges(modUpdates, unsupported, ct);
+        await ModInstaller.PerformChanges(changes, ct);
     }
 
-    public static async Task<(List<ModDownloadInfo> Updates, List<ModUninstallInfo> Unsupported)> CheckNewVersions(CancellationToken ct)
+    public static async Task<Changes> CheckNewVersions(CancellationToken ct)
     {
-        List<ModDownloadInfo> modUpdates = [];
+        ImmutableArray<ModInstallInfo>.Builder modUpdates = ImmutableArray.CreateBuilder<ModInstallInfo>();
+        ImmutableArray<ModUninstallInfo>.Builder unsupportedMods = ImmutableArray.CreateBuilder<ModUninstallInfo>();
 
         Log.Section($"Checking for updates");
         ProgressBar progressBar = new();
@@ -33,7 +34,6 @@ public static class Update
         AddThese(Context.Instance.Modlist.Mods.Select(v => v.Id));
 
         ImmutableArray<string> checkThese = [.. checkTheseSet];
-        List<ModUninstallInfo> unsupportedMods = [];
 
         for (int i = 0; i < checkThese.Length; i++)
         {
@@ -41,7 +41,7 @@ public static class Update
 
             progressBar.Report(Context.Instance.GetModName(modId) ?? modId, i, checkThese.Length);
 
-            ModDownloadInfo? update;
+            ModInstallInfo? update;
             try
             {
                 update = await ModrinthUtils.GetModIfNeeded(modId, ct);
@@ -75,6 +75,10 @@ public static class Update
 
         progressBar.Dispose();
 
-        return (modUpdates, unsupportedMods);
+        return new Changes()
+        {
+            Install = modUpdates.ToImmutable(),
+            Uninstall = unsupportedMods.ToImmutable(),
+        };
     }
 }
