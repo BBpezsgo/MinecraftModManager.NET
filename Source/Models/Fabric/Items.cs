@@ -5,9 +5,10 @@ using System.Text.Json.Serialization;
 
 namespace MMM.Fabric;
 
-public class Items<T>
+public abstract class Items<T> : IEnumerable<T>
 {
-
+    public abstract IEnumerator<T> GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 public class SingleItem<T>(T item) : Items<T>
@@ -15,6 +16,11 @@ public class SingleItem<T>(T item) : Items<T>
     public T Item => item;
 
     public static implicit operator T(SingleItem<T> v) => v.Item;
+
+    public override IEnumerator<T> GetEnumerator()
+    {
+        yield return item;
+    }
 
     public override string? ToString() => (item ?? throw new NullReferenceException()).ToString();
     public override bool Equals(object? obj)
@@ -41,7 +47,7 @@ public class MultipleItems<T>(List<T> items) : Items<T>, IList<T>
     public void Clear() => items.Clear();
     public bool Contains(T item) => items.Contains(item);
     public void CopyTo(T[] array, int arrayIndex) => items.CopyTo(array, arrayIndex);
-    public IEnumerator<T> GetEnumerator() => items.GetEnumerator();
+    public override IEnumerator<T> GetEnumerator() => items.GetEnumerator();
     public int IndexOf(T item) => items.IndexOf(item);
     public void Insert(int index, T item) => items.Insert(index, item);
     public bool Remove(T item) => items.Remove(item);
@@ -53,6 +59,7 @@ public class MultipleItems<T>(List<T> items) : Items<T>, IList<T>
     public override int GetHashCode() => items.GetHashCode();
 }
 
+[JsonConverter(typeof(ItemsJsonConverter<>))]
 public class ItemsJsonConverter<T> : JsonConverter<Items<T>>
 {
     public override Items<T> Read(
@@ -60,26 +67,14 @@ public class ItemsJsonConverter<T> : JsonConverter<Items<T>>
         Type typeToConvert,
         JsonSerializerOptions options)
     {
-        reader.SkipJunk();
-        if (reader.TokenType == JsonTokenType.StartArray)
+        JsonDocument doc = JsonDocument.ParseValue(ref reader);
+        if (doc.RootElement.ValueKind == JsonValueKind.Array)
         {
-            reader.Read();
-            List<T> items = [];
-            while (reader.TokenType != JsonTokenType.EndArray)
-            {
-                reader.SkipJunk();
-                if (reader.TokenType == JsonTokenType.EndArray)
-                {
-                    reader.Read();
-                    break;
-                }
-                items.Add(JsonSerializer.Deserialize<T>(ref reader, options) ?? throw new JsonException());
-            }
-            return new MultipleItems<T>(items);
+            return new MultipleItems<T>([.. doc.RootElement.EnumerateArray().Select(v => v.Deserialize<T>(options) ?? throw new JsonException())]);
         }
         else
         {
-            return new SingleItem<T>(JsonSerializer.Deserialize<T>(ref reader, options) ?? throw new JsonException());
+            return new SingleItem<T>(doc.Deserialize<T>(options) ?? throw new JsonException());
         }
     }
 
@@ -91,7 +86,7 @@ public class ItemsJsonConverter<T> : JsonConverter<Items<T>>
         switch (value)
         {
             case SingleItem<T> single:
-                writer.WriteStringValue(single.ToString());
+                JsonSerializer.Serialize(writer, single.Item, options);
                 break;
             case MultipleItems<T> multiple:
                 writer.WriteStartArray();

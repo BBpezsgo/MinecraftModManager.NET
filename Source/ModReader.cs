@@ -9,17 +9,12 @@ public static class ModReader
 {
     static async Task<FabricMod> ReadMod(ZipArchive archive, string filename, CancellationToken ct)
     {
-        string text;
-
+        try
         {
             ZipArchiveEntry fabricMod = archive.GetEntry("fabric.mod.json") ?? throw new ModLoadException($"File {Path.GetFileName(filename)} is not a fabric mod");
             using Stream stream = await fabricMod.OpenAsync(ct);
             using StreamReader reader = new(stream);
-            text = reader.ReadToEnd();
-        }
-
-        try
-        {
+            string text = reader.ReadToEnd();
             return JsonSerializer.Deserialize(Utils.SanitizeJson(text), FabricModJsonSerializerContext.Default.FabricMod)!;
         }
         catch (JsonException e)

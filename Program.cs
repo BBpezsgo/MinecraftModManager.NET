@@ -1,100 +1,138 @@
-﻿namespace MMM;
+﻿#pragma warning disable CS0162
+#pragma warning disable IDE0060
+
+namespace MMM;
 
 public static class Program
 {
     public static void Main(string[] args)
     {
-        if (!File.Exists(Context.ModlistPath))
-        {
-            Log.Error($"No package.json found");
-            return;
-        }
-
-        if (args.Length == 0)
-        {
-            Log.Error($"No arguments passed");
-            return;
-        }
-
         CancellationTokenSource cts = new();
         Console.CancelKeyPress += (sender, e) =>
         {
             cts.Cancel();
         };
-        Task task;
+
+        using Task task = Run(args, cts.Token);
+
+        while (!task.IsCompleted)
+        {
+            Thread.Yield();
+        }
+
+        if (task.Exception is not null)
+        {
+            Log.Error(task.Exception);
+        }
+    }
+
+    static async Task Run(string[] args, CancellationToken ct)
+    {
+        if (!File.Exists(Context.ModlistPath))
+        {
+            throw new ApplicationArgumentsException($"No package.json found");
+        }
+
+        if (args.Length == 0)
+        {
+            Help.PrintHelp(null);
+            return;
+        }
 
         switch (args[0])
         {
             case "update":
-                if (args.Length != 1)
+                if (args.ContainsAny("--help", "-h"))
                 {
-                    Log.Error($"Wrong number of arguments passed");
-                    return;
+                    Help.PrintHelp(args[0]);
+                    break;
                 }
 
-                task = Actions.Update.PerformUpdate(cts.Token);
+                if (args.Length != 1)
+                {
+                    throw new ApplicationArgumentsException($"Wrong number of arguments passed");
+                }
+
+                await Actions.Update.PerformUpdate(ct);
                 break;
             case "check":
-                if (args.Length != 1)
+                if (args.ContainsAny("--help", "-h"))
                 {
-                    Log.Error($"Wrong number of arguments passed");
-                    return;
+                    Help.PrintHelp(args[0]);
+                    break;
                 }
 
-                task = Actions.Check.PerformCheck(cts.Token);
+                if (args.Length != 1)
+                {
+                    throw new ApplicationArgumentsException($"Wrong number of arguments passed");
+                }
+
+                await Actions.Check.PerformCheck(ct);
                 break;
             case "add":
-                if (args.Length < 2)
+                if (args.ContainsAny("--help", "-h"))
                 {
-                    Log.Error($"Wrong number of arguments passed");
-                    return;
+                    Help.PrintHelp(args[0]);
+                    break;
                 }
 
-                task = Actions.Add.PerformAdd(args[1..], cts.Token);
+                if (args.Length < 2)
+                {
+                    throw new ApplicationArgumentsException($"Wrong number of arguments passed");
+                }
+
+                await Actions.Add.PerformAdd(args[1..], ct);
                 break;
             case "remove":
+                if (args.ContainsAny("--help", "-h"))
+                {
+                    Help.PrintHelp(args[0]);
+                    break;
+                }
+
                 if (args.Length < 2)
                 {
-                    Log.Error($"Wrong number of arguments passed");
-                    return;
+                    throw new ApplicationArgumentsException($"Wrong number of arguments passed");
                 }
 
-                task = Actions.Remove.PerformRemove(args[1..], cts.Token);
+                await Actions.Remove.PerformRemove(args[1..], ct);
                 break;
             case "list":
+                if (args.ContainsAny("--help", "-h"))
+                {
+                    Help.PrintHelp(args[0]);
+                    break;
+                }
+
                 if (args.Length != 1)
                 {
-                    Log.Error($"Wrong number of arguments passed");
-                    return;
+                    throw new ApplicationArgumentsException($"Wrong number of arguments passed");
                 }
 
-                task = Actions.List.PerformList(cts.Token);
+                await Actions.List.PerformList(ct);
                 break;
             case "change":
-                if (args.Length != 2)
+                if (args.ContainsAny("--help", "-h"))
                 {
-                    Log.Error($"Wrong number of arguments passed");
-                    return;
+                    Help.PrintHelp(args[0]);
+                    break;
                 }
 
-                task = Actions.Change.PerformChange(args[1], cts.Token);
+                if (args.Length != 2)
+                {
+                    throw new ApplicationArgumentsException($"Wrong number of arguments passed");
+                }
+
+                await Actions.Change.PerformChange(args[1], ct);
                 break;
             default:
-                Log.Error($"Invalid action {args[0]}");
-                return;
-        }
+                if (args.ContainsAny("--help", "-h"))
+                {
+                    Help.PrintHelp(null);
+                    break;
+                }
 
-        using (task)
-        {
-            while (!task.IsCompleted)
-            {
-                Thread.Yield();
-            }
-
-            if (task.Exception is not null)
-            {
-                Log.Error(task.Exception);
-            }
+                throw new ApplicationArgumentsException($"Invalid action {args[0]}");
         }
     }
 }

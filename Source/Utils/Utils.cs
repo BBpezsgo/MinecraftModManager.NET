@@ -1,3 +1,5 @@
+#pragma warning disable CA5350 // Do Not Use Weak Cryptographic Algorithms
+
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -6,6 +8,22 @@ namespace MMM;
 
 public static class Utils
 {
+    public static bool ContainsAny<T>(this T[] collection, params ReadOnlySpan<T> values)
+    {
+        for (int i = 0; i < values.Length; i++)
+        {
+            if (collection.Contains(values[i])) return true;
+        }
+        return false;
+    }
+
+    public static IEnumerable<TValue> AppendRange<TValue, TCollection>(this IEnumerable<TValue> self, IEnumerable<TCollection> values)
+        where TCollection : IEnumerable<TValue>
+    {
+        foreach (TValue v in self) yield return v;
+        foreach (TCollection v in values) foreach (TValue w in v) yield return w;
+    }
+
     public static readonly JsonSerializerOptions JsonSerializerOptions = new(JsonSerializerDefaults.General)
     {
         WriteIndented = true,

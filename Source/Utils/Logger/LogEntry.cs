@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace MMM;
 
-readonly struct LogEntry(string text) : IAdditionOperators<LogEntry, LogEntry, LogEntry>, IEquatable<LogEntry>
+public readonly struct LogEntry(string text) : IAdditionOperators<LogEntry, LogEntry, LogEntry>, IEquatable<LogEntry>
 {
     readonly string _text = text;
 
@@ -47,4 +47,7 @@ readonly struct LogEntry(string text) : IAdditionOperators<LogEntry, LogEntry, L
     public static implicit operator LogEntry(string? v) => new(v ?? string.Empty);
 
     public override int GetHashCode() => _text.GetHashCode();
+
+    public static bool operator ==(LogEntry left, LogEntry right) => left.Equals(right);
+    public static bool operator !=(LogEntry left, LogEntry right) => !left.Equals(right);
 }

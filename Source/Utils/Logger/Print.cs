@@ -3,7 +3,7 @@ namespace MMM;
 static partial class Log
 {
     static LogEntry LastLogEntry;
-    public static List<Lock> InteractiveLocks = [];
+    internal static List<Lock> InteractiveLocks = [];
 
     readonly struct AutoScope : IDisposable
     {
