@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Text.Json;
-using MMM.Fabric;
 using Modrinth;
 
 namespace MMM;
@@ -14,8 +13,8 @@ public class Context
     Environment.CurrentDirectory;
 #endif
 
-    public static readonly string ModlistPath = Path.Combine(MinecraftPath, "modlist.json");
-    public static readonly string ModlistLockPath = Path.Combine(MinecraftPath, "modlist-lock.json");
+    public static readonly string ModlistPath = Path.GetFullPath(Path.Combine(MinecraftPath, "modlist.json"));
+    public static readonly string ModlistLockPath = Path.GetFullPath(Path.Combine(MinecraftPath, "modlist-lock.json"));
 
     public required ModList Modlist { get; init; }
     public required List<ModLock> ModlistLock { get; init; }
@@ -108,11 +107,15 @@ public class Context
 public readonly struct InstalledComponent
 {
     public required string? FileName { get; init; }
-    public required GenericComponent Component { get; init; }
+    public required IMod Component { get; init; }
+
+    public override string? ToString() => Component.Name ?? Component.Id ?? FileName;
 }
 
 public readonly struct InstalledMod
 {
     public required string FileName { get; init; }
-    public required FabricMod Mod { get; init; }
+    public required IMod Mod { get; init; }
+
+    public override string ToString() => Mod.Name ?? Mod.Id ?? FileName;
 }

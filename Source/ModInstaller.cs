@@ -12,6 +12,7 @@ public static class ModInstaller
 
         ImmutableArray<ModInstallInfo>.Builder modUpdates = ImmutableArray.CreateBuilder<ModInstallInfo>();
         ImmutableArray<ModUninstallInfo>.Builder modUninstalls = ImmutableArray.CreateBuilder<ModUninstallInfo>();
+        List<ModEntry> unsupportedMods = [];
 
         {
             Log.MinorAction($"Checking for new mods");
@@ -43,6 +44,12 @@ public static class ModInstaller
                     {
                         update = await ModrinthUtils.GetModDownload(mod.Id, ct);
                     }
+                    catch (ModNotSupported e)
+                    {
+                        unsupportedMods.Add(mod);
+                        Log.Error(e);
+                        continue;
+                    }
                     catch (Exception e)
                     {
                         Log.Error(e);
@@ -59,6 +66,7 @@ public static class ModInstaller
                         File = update.File,
                         LockEntry = update.LockEntry,
                         Version = update.Version,
+                        Name = update.Name,
                     });
 
                     foreach (Modrinth.Models.Dependency dependency in update.Version.Dependencies ?? [])
@@ -72,6 +80,7 @@ public static class ModInstaller
                                 ModEntry entry = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == dependency.ProjectId) ?? new ModEntry()
                                 {
                                     Id = dependency.ProjectId,
+                                    Name = await ModrinthUtils.GetModName(dependency.ProjectId, ct),
                                 };
                                 (bool needsDownload, reason) = await IsNeeded(entry, ct);
                                 if (!needsDownload) break;
@@ -90,13 +99,53 @@ public static class ModInstaller
                 progressBar.Dispose();
             }
 
+            if (unsupportedMods.Count > 0 && Log.AskYesNo($"Do you want to remove {unsupportedMods.Count} unsupported mods?", true))
+            {
+                foreach (ModEntry mod in unsupportedMods)
+                {
+                    if (modUninstalls.Any(v => v.LockEntry?.Id == mod.Id)) continue;
+
+                    string name = await ModrinthUtils.GetModName(mod.Id, ct);
+
+                    foreach (ModLock other in Context.Instance.ModlistLock)
+                    {
+                        if (other.Dependencies.Contains(mod.Id))
+                        {
+                            Log.Error($"Mod {name} is unsupported but required by mod {await ModrinthUtils.GetModName(other.Id, ct)}");
+                        }
+                    }
+
+                    Context.Instance.Modlist.Mods.Remove(mod);
+                    ModLock? modLock = Context.Instance.ModlistLock.FirstOrDefault(v => v.Id == (string?)mod.Id);
+                    if (modLock is not null)
+                    {
+                        string file = Context.Instance.GetModPath(modLock);
+                        modUninstalls.Add(new ModUninstallInfo()
+                        {
+                            Reason = ModUninstallReason.NotSupported,
+                            LockEntry = modLock,
+                            File = File.Exists(file) ? file : null,
+                            Name = name,
+                        });
+                    }
+                    else
+                    {
+                        modUninstalls.Add(new ModUninstallInfo()
+                        {
+                            Reason = ModUninstallReason.NotSupported,
+                            LockEntry = null,
+                            File = null,
+                            Name = name,
+                        });
+                    }
+                }
+            }
+
             Log.MinorAction($"Checking for orphan mods");
 
             foreach (ModLock modlock in Context.Instance.ModlistLock)
             {
-                ModEntry? mod = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == modlock.Id);
-
-                if (mod is not null) continue;
+                if (Context.Instance.Modlist.Mods.Any(v => v.Id == modlock.Id)) continue;
 
                 string? file = Context.Instance.GetModPath(modlock);
 
@@ -110,6 +159,7 @@ public static class ModInstaller
                     Reason = ModUninstallReason.Orphan,
                     File = file,
                     LockEntry = modlock,
+                    Name = await ModrinthUtils.GetModName(modlock.Id, ct),
                 });
             }
 
@@ -154,17 +204,17 @@ public static class ModInstaller
 
                     try
                     {
-                        Modrinth.Models.Project project = await Context.Modrinth.Project.GetAsync(mod, ct);
+                        string name = await ModrinthUtils.GetModNameForce(mod, ct);
 
                         ModLock? lockEntry = Context.Instance.ModlistLock.FirstOrDefault(v => v.Id == mod);
                         if (lockEntry is not null)
                         {
-                            lockEntry.Name = project.Title;
+                            lockEntry.Name = name;
                             await File.WriteAllTextAsync(Context.ModlistLockPath, JsonSerializer.Serialize(Context.Instance.ModlistLock, ModLockListJsonSerializerContext.Default.ListModLock), ct);
                         }
 
                         ModEntry? modEntry = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == mod);
-                        if (modEntry is not null) modEntry.Name = project.Title;
+                        if (modEntry is not null) modEntry.Name = name;
                     }
                     catch (ModrinthApiException ex)
                     {
@@ -283,23 +333,9 @@ public static class ModInstaller
         ImmutableArray<InstalledMod> mods = await Context.Instance.GetMods(ct);
 
         {
-            string GetName1(ModInstallInfo update)
-            {
-                return Context.Instance.GetModName(update.Mod.Id) ??
-                    $"{update.LockEntry?.Name ?? update.DownloadFileName} ({update.Mod.Id})";
-            }
-
-            string GetName2(ModUninstallInfo uninstall)
-            {
-                return Context.Instance.GetModName(uninstall.LockEntry?.Id) ??
-                    (uninstall.File is not null && uninstall.LockEntry is not null
-                    ? $"{uninstall.File} ({uninstall.LockEntry.Id})"
-                    : $"{uninstall.File ?? uninstall.LockEntry?.Id}");
-            }
-
             int nameMaxWidth = 0;
-            nameMaxWidth = changes.Install.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, GetName1(v).Length));
-            nameMaxWidth = changes.Uninstall.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, GetName2(v).Length));
+            nameMaxWidth = changes.Install.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, v.Name.Length));
+            nameMaxWidth = changes.Uninstall.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, v.Name.Length));
             nameMaxWidth += 2;
 
             if (!changes.IsEmpty)
@@ -311,7 +347,7 @@ public static class ModInstaller
 
             foreach (ModInstallInfo update in changes.Install)
             {
-                string name = GetName1(update);
+                string name = update.Name;
 
                 switch (update.Reason)
                 {
@@ -342,7 +378,7 @@ public static class ModInstaller
                 }
                 Console.Write(new string(' ', nameMaxWidth - name.Length));
 
-                Fabric.FabricMod? existing = update.LockEntry is null ? null : mods.FirstOrDefault(v => Path.GetFileName(v.FileName) == update.LockEntry.FileName).Mod;
+                IMod? existing = update.LockEntry is null ? null : mods.FirstOrDefault(v => Path.GetFileName(v.FileName) == update.LockEntry.FileName).Mod;
 
                 if (existing is not null)
                 {
@@ -395,7 +431,7 @@ public static class ModInstaller
 
             foreach (ModUninstallInfo uninstall in changes.Uninstall)
             {
-                string name = GetName2(uninstall);
+                string name = uninstall.Name;
 
                 switch (uninstall.Reason)
                 {

@@ -28,15 +28,18 @@ public static class Program
 
     static async Task Run(string[] args, CancellationToken ct)
     {
-        if (!File.Exists(Context.ModlistPath))
-        {
-            throw new ApplicationArgumentsException($"No package.json found");
-        }
-
         if (args.Length == 0)
         {
             Help.PrintHelp(null);
             return;
+        }
+
+        if (!File.Exists(Context.ModlistPath))
+        {
+            Log.Warning($"No package.json found in the current folder. ({Path.GetFullPath(Context.ModlistPath)})");
+            if (!Log.AskYesNo("Do you want to install it?")) return;
+
+            Actions.Install.PerformInstall();
         }
 
         switch (args[0])

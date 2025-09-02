@@ -30,7 +30,7 @@ public static class Remove
 
         foreach ((string modId, ModEntry? mod, ModLock modlock) in toUninstall)
         {
-            string? modName = Context.Instance.GetModName(modId);
+            string modName = await ModrinthUtils.GetModName(modId, ct);
 
             List<ModLock> usedBy = [
                 .. Context.Instance.ModlistLock
@@ -40,7 +40,7 @@ public static class Remove
 
             if (usedBy.Count > 0)
             {
-                Log.Error($"Mod {modlock.Name ?? modName} is used by the following mod(s):");
+                Log.Error($"Mod {modName} is used by the following mod(s):");
                 foreach (ModLock item in usedBy)
                 {
                     Log.None(item.Name ?? item.FileName ?? item.Id);

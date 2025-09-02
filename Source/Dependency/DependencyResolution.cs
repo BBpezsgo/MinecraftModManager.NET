@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using MMM.Fabric;
+using MMM.Forge;
 
 namespace MMM;
 
@@ -12,19 +13,19 @@ public static class DependencyResolution
         NotFound,
     }
 
-    static (InstalledComponent? Mod, DependencyStatus Status) FindBestMatch(string id, VersionRange version, ImmutableArray<InstalledComponent> mods)
+    static (InstalledComponent? Mod, DependencyStatus Status) FindBestMatch(string id, IVersionRange version, ImmutableArray<InstalledComponent> mods)
     {
         InstalledComponent? best = null;
 
         foreach (InstalledComponent installedMod in mods)
         {
-            GenericComponent mod = installedMod.Component;
+            IMod mod = installedMod.Component;
 
             if (mod.Id != id)
             {
                 if (mod is not FabricMod fabricMod || fabricMod.Provides.IsDefaultOrEmpty || !fabricMod.Provides.Contains(id))
                 {
-                    continue;
+                continue;
                 }
             }
 
@@ -46,7 +47,7 @@ public static class DependencyResolution
         }
     }
 
-    static bool ShouldSkip(string dependency) => dependency is "fabricloader" or "java" or "another-mod";
+    static bool ShouldSkip(string dependency) => dependency is "fabricloader" or "java" or "another-mod" or "forge" or "neoforge";
 
     public static async Task<(ImmutableArray<DependencyError> Errors, bool Ok)> CheckDependencies(Context settings, bool printErrorsOnly, CancellationToken ct)
     {
@@ -92,131 +93,182 @@ public static class DependencyResolution
 
         foreach (InstalledMod installedMod in mods)
         {
-            FabricMod mod = installedMod.Mod;
+            IMod mod = installedMod.Mod;
             ModLock? lockEntry = settings.ModlistLock.FirstOrDefault(v => v.FileName == Path.GetFileName(installedMod.FileName));
             ModEntry? modEntry = lockEntry is null ? null : settings.Modlist.Mods.FirstOrDefault(v => v.Id == lockEntry.Id);
 
             if (lockEntry is null) continue;
 
-            if (mod.Depends is not null)
+            if (mod is FabricMod fabricMod)
             {
-                foreach (KeyValuePair<string, VersionRange> dep in mod.Depends)
+                if (fabricMod.Depends is not null)
                 {
-                    if (ShouldSkip(dep.Key)) continue;
-                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
-
-                    switch (status)
+                    foreach (KeyValuePair<string, FabricVersionRange> dep in fabricMod.Depends)
                     {
-                        case DependencyStatus.OK:
-                            break;
-                        case DependencyStatus.VersionMismatch:
-                            ok = false;
+                        if (ShouldSkip(dep.Key)) continue;
+                        (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
 
-                            Log.Error($"Dependency {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
-                            break;
-                        case DependencyStatus.NotFound:
-                            errors.Add(new DependencyError()
-                            {
-                                Level = DependencyErrorLevel.Depends,
-                                Subject = installedMod,
-                                OtherId = dep.Key,
-                                OtherInstalled = null,
-                            });
-                            ok = false;
+                        switch (status)
+                        {
+                            case DependencyStatus.OK:
+                                break;
+                            case DependencyStatus.VersionMismatch:
+                                ok = false;
 
-                            Log.Error($"Dependency {dep.Key} {dep.Value} for mod {mod.Id} not installed");
-                            break;
+                                Log.Error($"Dependency {dep.Key} {dep.Value} for mod {fabricMod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
+                                break;
+                            case DependencyStatus.NotFound:
+                                errors.Add(new DependencyError()
+                                {
+                                    Level = DependencyErrorLevel.Depends,
+                                    Subject = installedMod,
+                                    OtherId = dep.Key,
+                                    OtherInstalled = null,
+                                });
+                                ok = false;
+
+                                Log.Error($"Dependency {dep.Key} {dep.Value} for mod {fabricMod.Id} not installed");
+                                break;
+                        }
+                    }
+                }
+
+                if (fabricMod.Recommends is not null)
+                {
+                    foreach (KeyValuePair<string, FabricVersionRange> dep in fabricMod.Recommends)
+                    {
+                        if (ShouldSkip(dep.Key)) continue;
+                        (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
+
+                        switch (status)
+                        {
+                            case DependencyStatus.OK:
+                                break;
+                            case DependencyStatus.VersionMismatch:
+                                if (!printErrorsOnly) Log.Warning($"Recommendation {dep.Key} {dep.Value} for mod {fabricMod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
+                                break;
+                            case DependencyStatus.NotFound:
+                                if (!printErrorsOnly) Log.Warning($"Recommendation {dep.Key} {dep.Value} for mod {fabricMod.Id} not installed");
+                                break;
+                        }
+                    }
+                }
+
+                if (fabricMod.Suggests is not null)
+                {
+                    foreach (KeyValuePair<string, FabricVersionRange> dep in fabricMod.Suggests)
+                    {
+                        if (ShouldSkip(dep.Key)) continue;
+                        (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
+
+                        switch (status)
+                        {
+                            case DependencyStatus.OK:
+                                break;
+                            case DependencyStatus.VersionMismatch:
+                                if (!printErrorsOnly) Log.Info($"Suggestion {dep.Key} {dep.Value} for mod {fabricMod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
+                                break;
+                            case DependencyStatus.NotFound:
+                                if (!printErrorsOnly) Log.Info($"Suggestion {dep.Key} {dep.Value} for mod {fabricMod.Id} not installed");
+                                break;
+                        }
+                    }
+                }
+
+                if (fabricMod.Conflicts is not null)
+                {
+                    foreach (KeyValuePair<string, FabricVersionRange> dep in fabricMod.Conflicts)
+                    {
+                        if (ShouldSkip(dep.Key)) continue;
+                        (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
+
+                        switch (status)
+                        {
+                            case DependencyStatus.OK:
+                                if (!printErrorsOnly) Log.Warning($"Mod {other!.Value.Component.Id} {other.Value.Component.Version} conflicts with {fabricMod.Id}");
+                                break;
+                            case DependencyStatus.VersionMismatch:
+                                break;
+                            case DependencyStatus.NotFound:
+                                break;
+                        }
+                    }
+                }
+
+                if (fabricMod.Breaks is not null)
+                {
+                    foreach (KeyValuePair<string, FabricVersionRange> dep in fabricMod.Breaks)
+                    {
+                        if (ShouldSkip(dep.Key)) continue;
+                        (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
+
+                        switch (status)
+                        {
+                            case DependencyStatus.OK:
+                                errors.Add(new DependencyError()
+                                {
+                                    Level = DependencyErrorLevel.Breaks,
+                                    Subject = installedMod,
+                                    OtherId = dep.Key,
+                                    OtherInstalled = other,
+                                });
+                                ok = false;
+
+                                Log.Error($"Mod {other!.Value.Component.Id} {other.Value.Component.Version} breaks {fabricMod.Id}");
+                                break;
+                            case DependencyStatus.VersionMismatch:
+                                break;
+                            case DependencyStatus.NotFound:
+                                break;
+                        }
                     }
                 }
             }
-
-            if (mod.Recommends is not null)
+            else if (mod is ForgeMod forgeMod)
             {
-                foreach (KeyValuePair<string, VersionRange> dep in mod.Recommends)
+                foreach (ForgeModDependency dep in forgeMod.Dependencies)
                 {
-                    if (ShouldSkip(dep.Key)) continue;
-                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
+                    if (ShouldSkip(dep.ModId)) continue;
+                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.ModId, dep.VersionRange, components);
 
-                    switch (status)
+                    if (dep.Mandatory)
                     {
-                        case DependencyStatus.OK:
-                            break;
-                        case DependencyStatus.VersionMismatch:
-                            if (!printErrorsOnly) Log.Warning($"Recommendation {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
-                            break;
-                        case DependencyStatus.NotFound:
-                            if (!printErrorsOnly) Log.Warning($"Recommendation {dep.Key} {dep.Value} for mod {mod.Id} not installed");
-                            break;
+                        switch (status)
+                        {
+                            case DependencyStatus.OK:
+                                break;
+                            case DependencyStatus.VersionMismatch:
+                                ok = false;
+
+                                Log.Error($"Dependency {dep.ModId} {dep.VersionRange} for mod {forgeMod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
+                                break;
+                            case DependencyStatus.NotFound:
+                                errors.Add(new DependencyError()
+                                {
+                                    Level = DependencyErrorLevel.Depends,
+                                    Subject = installedMod,
+                                    OtherId = dep.ModId,
+                                    OtherInstalled = null,
+                                });
+                                ok = false;
+
+                                Log.Error($"Dependency {dep.ModId} {dep.VersionRange} for mod {forgeMod.Id} not installed");
+                                break;
+                        }
                     }
-                }
-            }
-
-            if (mod.Suggests is not null)
-            {
-                foreach (KeyValuePair<string, VersionRange> dep in mod.Suggests)
-                {
-                    if (ShouldSkip(dep.Key)) continue;
-                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
-
-                    switch (status)
+                    else
                     {
-                        case DependencyStatus.OK:
-                            break;
-                        case DependencyStatus.VersionMismatch:
-                            if (!printErrorsOnly) Log.Info($"Suggestion {dep.Key} {dep.Value} for mod {mod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
-                            break;
-                        case DependencyStatus.NotFound:
-                            if (!printErrorsOnly) Log.Info($"Suggestion {dep.Key} {dep.Value} for mod {mod.Id} not installed");
-                            break;
-                    }
-                }
-            }
-
-            if (mod.Conflicts is not null)
-            {
-                foreach (KeyValuePair<string, VersionRange> dep in mod.Conflicts)
-                {
-                    if (ShouldSkip(dep.Key)) continue;
-                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
-
-                    switch (status)
-                    {
-                        case DependencyStatus.OK:
-                            if (!printErrorsOnly) Log.Warning($"Mod {other!.Value.Component.Id} {other.Value.Component.Version} conflicts with {mod.Id}");
-                            break;
-                        case DependencyStatus.VersionMismatch:
-                            break;
-                        case DependencyStatus.NotFound:
-                            break;
-                    }
-                }
-            }
-
-            if (mod.Breaks is not null)
-            {
-                foreach (KeyValuePair<string, VersionRange> dep in mod.Breaks)
-                {
-                    if (ShouldSkip(dep.Key)) continue;
-                    (InstalledComponent? other, DependencyStatus status) = FindBestMatch(dep.Key, dep.Value, components);
-
-                    switch (status)
-                    {
-                        case DependencyStatus.OK:
-                            errors.Add(new DependencyError()
-                            {
-                                Level = DependencyErrorLevel.Breaks,
-                                Subject = installedMod,
-                                OtherId = dep.Key,
-                                OtherInstalled = other,
-                            });
-                            ok = false;
-
-                            Log.Error($"Mod {other!.Value.Component.Id} {other.Value.Component.Version} breaks {mod.Id}");
-                            break;
-                        case DependencyStatus.VersionMismatch:
-                            break;
-                        case DependencyStatus.NotFound:
-                            break;
+                        switch (status)
+                        {
+                            case DependencyStatus.OK:
+                                break;
+                            case DependencyStatus.VersionMismatch:
+                                if (!printErrorsOnly) Log.Warning($"Recommendation {dep.ModId} {dep.VersionRange} for mod {forgeMod.Id} not satisfied (installed version: {other!.Value.Component.Version})");
+                                break;
+                            case DependencyStatus.NotFound:
+                                if (!printErrorsOnly) Log.Warning($"Recommendation {dep.ModId} {dep.VersionRange} for mod {forgeMod.Id} not installed");
+                                break;
+                        }
                     }
                 }
             }

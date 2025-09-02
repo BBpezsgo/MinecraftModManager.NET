@@ -31,10 +31,14 @@ public static class Check
 
                 if (hash != lockEntry.Hash)
                 {
-                    Log.Error($"File {Path.GetFileName(file)} checksum mismatched");
+                    Log.Warning($"File {Path.GetFileName(file)} checksum mismatched");
                     continue;
                 }
             }
+        }
+        else
+        {
+            Log.Info($"Directory {context.ModsDirectory} does not exists");
         }
 
         for (int i = 0; i < context.ModlistLock.Count; i++)
@@ -50,6 +54,12 @@ public static class Check
                 Log.Error($"File {file} does not exists");
                 continue;
             }
+        }
+
+        if (context.ModlistLock.Count == 0 &&
+            !File.Exists(Context.ModlistLockPath))
+        {
+            Log.Info($"File {Context.ModlistLockPath} does not exists");
         }
 
         progressBar.Dispose();
@@ -70,14 +80,13 @@ public static class Check
         {
             if (error.Level == DependencyErrorLevel.Depends)
             {
-                (string? id, string? name) = await ModrinthUtils.FindModOnline(error.OtherId, ct);
-
-                if (id is null) continue;
+                (string Id, string Name)? v = await ModrinthUtils.FindModOnline(error.OtherId, ct);
+                if (!v.HasValue) continue;
 
                 Context.Instance.Modlist.Mods.Add(new ModEntry()
                 {
-                    Id = id,
-                    Name = name,
+                    Id = v.Value.Id,
+                    Name = v.Value.Name,
                 });
             }
         }

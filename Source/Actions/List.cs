@@ -2,7 +2,7 @@ namespace MMM.Actions;
 
 public static class List
 {
-    public static Task PerformList(CancellationToken ct) => Task.Run(() =>
+    public static async Task PerformList(CancellationToken ct)
     {
         Log.MajorAction("Reading mods");
 
@@ -11,7 +11,7 @@ public static class List
             ModEntry? modEntry = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == lockEntry.Id);
             bool isDependency = Context.Instance.ModlistLock.Any(v => v.Dependencies.Contains(lockEntry.Id));
 
-            string? name = Context.Instance.GetModName(lockEntry.Id) ?? lockEntry.FileName;
+            string name = await ModrinthUtils.GetModName(lockEntry.Id, ct);
 
             Log.Write($"{name} ({lockEntry.Id})");
 
@@ -33,5 +33,5 @@ public static class List
 
             Log.NewLine();
         }
-    }, ct);
+    }
 }

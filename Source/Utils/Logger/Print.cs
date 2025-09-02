@@ -215,7 +215,7 @@ static partial class Log
     {
         using AutoScope _ = Auto();
 
-        Console.ForegroundColor = ConsoleColor.Gray;
+        Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write("    ");
         Console.WriteLine(text);
         Console.ResetColor();

@@ -8,6 +8,7 @@ public class ModInstallInfo
     public required ModLock? LockEntry { get; init; }
     public required string DownloadFileName { get; init; }
     public required ModEntry Mod { get; init; }
+    public required string Name { get; init; }
 
     public override string ToString() => $"{Mod.Name ?? DownloadFileName}";
 }

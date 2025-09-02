@@ -5,16 +5,16 @@ using System.Text.Json.Serialization;
 
 namespace MMM.Fabric;
 
-[JsonConverter(typeof(VersionRangeJsonConverter))]
-public abstract class VersionRange
+[JsonConverter(typeof(FabricVersionRangeJsonConverter))]
+public abstract class FabricVersionRange : IVersionRange
 {
     public abstract bool Satisfies(string version);
     public abstract bool Satisfies(SemanticVersion version);
 }
 
-public class VersionRangeJsonConverter : JsonConverter<VersionRange>
+public class FabricVersionRangeJsonConverter : JsonConverter<FabricVersionRange>
 {
-    public override VersionRange Read(
+    public override FabricVersionRange Read(
         ref Utf8JsonReader reader,
         Type typeToConvert,
         JsonSerializerOptions options)
@@ -25,17 +25,17 @@ public class VersionRangeJsonConverter : JsonConverter<VersionRange>
             string s = reader.GetString()!;
             if (s.Contains(' '))
             {
-                return new ListedVersionRange(VersionListOperator.And, [.. s.Split(' ').Select(v => new SingleVersionRange(v))]);
+                return new FabricListedVersionRange(FabricVersionListOperator.And, [.. s.Split(' ').Select(v => new FabricSingleVersionRange(v))]);
             }
             else
             {
-                return new SingleVersionRange(s);
+                return new FabricSingleVersionRange(s);
             }
         }
         else if (reader.TokenType == JsonTokenType.StartArray)
         {
             reader.Read();
-            ImmutableArray<SingleVersionRange>.Builder versions = ImmutableArray.CreateBuilder<SingleVersionRange>();
+            ImmutableArray<FabricSingleVersionRange>.Builder versions = ImmutableArray.CreateBuilder<FabricSingleVersionRange>();
             while (reader.TokenType != JsonTokenType.EndArray)
             {
                 reader.SkipJunk();
@@ -48,10 +48,10 @@ public class VersionRangeJsonConverter : JsonConverter<VersionRange>
                 {
                     throw new JsonException("Expected a string");
                 }
-                versions.Add(new SingleVersionRange(reader.GetString()!));
+                versions.Add(new FabricSingleVersionRange(reader.GetString()!));
                 reader.Read();
             }
-            return new ListedVersionRange(VersionListOperator.Or, versions.ToImmutable());
+            return new FabricListedVersionRange(FabricVersionListOperator.Or, versions.ToImmutable());
         }
         else
         {
@@ -61,17 +61,17 @@ public class VersionRangeJsonConverter : JsonConverter<VersionRange>
 
     public override void Write(
         Utf8JsonWriter writer,
-        VersionRange value,
+        FabricVersionRange value,
         JsonSerializerOptions options)
     {
         switch (value)
         {
-            case SingleVersionRange singleVersion:
+            case FabricSingleVersionRange singleVersion:
                 writer.WriteStringValue(singleVersion.ToString());
                 break;
-            case ListedVersionRange listedVersion:
+            case FabricListedVersionRange listedVersion:
                 writer.WriteStartArray();
-                foreach (SingleVersionRange item in listedVersion.Values)
+                foreach (FabricSingleVersionRange item in listedVersion.Values)
                 {
                     writer.WriteStringValue(item.ToString());
                 }
@@ -83,7 +83,7 @@ public class VersionRangeJsonConverter : JsonConverter<VersionRange>
     }
 }
 
-public enum VersionOperator
+public enum FabricVersionOperator
 {
     Equal,
     GreaterEqual,
@@ -94,54 +94,54 @@ public enum VersionOperator
     UptoMinor,
 }
 
-public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
+public class FabricSingleVersionRange : FabricVersionRange, IEquatable<FabricSingleVersionRange>
 {
-    public VersionOperator Operator { get; }
+    public FabricVersionOperator Operator { get; }
     public PartialSemanticVersion? Version { get; }
     public string Raw { get; }
 
-    public SingleVersionRange(string value)
+    public FabricSingleVersionRange(string value)
     {
         //if (value.Contains('-')) throw new NotSupportedException($"Range versions not supported");
 
         if (value.StartsWith('='))
         {
-            Operator = VersionOperator.Equal;
+            Operator = FabricVersionOperator.Equal;
             Raw = value = value[1..];
         }
         else if (value.StartsWith(">=", StringComparison.Ordinal))
         {
-            Operator = VersionOperator.GreaterEqual;
+            Operator = FabricVersionOperator.GreaterEqual;
             Raw = value = value[2..];
         }
         else if (value.StartsWith("<=", StringComparison.Ordinal))
         {
-            Operator = VersionOperator.LessEqual;
+            Operator = FabricVersionOperator.LessEqual;
             Raw = value = value[2..];
         }
         else if (value.StartsWith('>'))
         {
-            Operator = VersionOperator.Greater;
+            Operator = FabricVersionOperator.Greater;
             Raw = value = value[1..];
         }
         else if (value.StartsWith('<'))
         {
-            Operator = VersionOperator.Less;
+            Operator = FabricVersionOperator.Less;
             Raw = value = value[1..];
         }
         else if (value.StartsWith('^'))
         {
-            Operator = VersionOperator.UptoMajor;
+            Operator = FabricVersionOperator.UptoMajor;
             Raw = value = value[1..];
         }
         else if (value.StartsWith('~'))
         {
-            Operator = VersionOperator.UptoMinor;
+            Operator = FabricVersionOperator.UptoMinor;
             Raw = value = value[1..];
         }
         else
         {
-            Operator = VersionOperator.Equal;
+            Operator = FabricVersionOperator.Equal;
             Raw = value;
         }
 
@@ -150,18 +150,18 @@ public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
 
     public override string ToString() => Raw == "*" ? Raw : $"{Operator switch
     {
-        VersionOperator.Equal => "=",
-        VersionOperator.GreaterEqual => ">=",
-        VersionOperator.LessEqual => "<=",
-        VersionOperator.Greater => ">",
-        VersionOperator.Less => "<",
-        VersionOperator.UptoMajor => "^",
-        VersionOperator.UptoMinor => "~",
+        FabricVersionOperator.Equal => "=",
+        FabricVersionOperator.GreaterEqual => ">=",
+        FabricVersionOperator.LessEqual => "<=",
+        FabricVersionOperator.Greater => ">",
+        FabricVersionOperator.Less => "<",
+        FabricVersionOperator.UptoMajor => "^",
+        FabricVersionOperator.UptoMinor => "~",
         _ => null,
     }}{Raw}";
-    public bool Equals(SingleVersionRange? other) => other is not null && Raw == other.Raw;
+    public bool Equals(FabricSingleVersionRange? other) => other is not null && Raw == other.Raw;
     public override int GetHashCode() => Raw.GetHashCode();
-    public override bool Equals(object? obj) => obj is SingleVersionRange other && Equals(other);
+    public override bool Equals(object? obj) => obj is FabricSingleVersionRange other && Equals(other);
 
     public override bool Satisfies(SemanticVersion version)
     {
@@ -169,21 +169,21 @@ public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
         if (!Version.HasValue) return false;
         switch (Operator)
         {
-            case VersionOperator.Equal:
+            case FabricVersionOperator.Equal:
                 return version == Version.Value;
-            case VersionOperator.GreaterEqual:
+            case FabricVersionOperator.GreaterEqual:
                 return version >= Version.Value;
-            case VersionOperator.LessEqual:
+            case FabricVersionOperator.LessEqual:
                 return version <= Version.Value;
-            case VersionOperator.Greater:
+            case FabricVersionOperator.Greater:
                 return version > Version.Value;
-            case VersionOperator.Less:
+            case FabricVersionOperator.Less:
                 return version < Version.Value;
-            case VersionOperator.UptoMajor:
+            case FabricVersionOperator.UptoMajor:
                 if (version >= Version.Value) return true;
                 if (version < new PartialSemanticVersion(Version.Value.Major.HasValue ? (Version.Value.Major.Value + 1) : null, 0, 0)) return true;
                 return true;
-            case VersionOperator.UptoMinor:
+            case FabricVersionOperator.UptoMinor:
                 if (version >= Version.Value) return true;
                 if (version < new PartialSemanticVersion(Version.Value.Major, Version.Value.Minor.HasValue ? (Version.Value.Minor.Value + 1) : null, 0)) return true;
                 return true;
@@ -200,37 +200,37 @@ public class SingleVersionRange : VersionRange, IEquatable<SingleVersionRange>
     }
 }
 
-public enum VersionListOperator
+public enum FabricVersionListOperator
 {
     And,
     Or,
 }
 
-public class ListedVersionRange(VersionListOperator @operator, ImmutableArray<SingleVersionRange> values) : VersionRange, IEquatable<ListedVersionRange>
+public class FabricListedVersionRange(FabricVersionListOperator @operator, ImmutableArray<FabricSingleVersionRange> values) : FabricVersionRange, IEquatable<FabricListedVersionRange>
 {
-    public VersionListOperator Operator { get; } = @operator;
-    public ImmutableArray<SingleVersionRange> Values { get; } = values;
+    public FabricVersionListOperator Operator { get; } = @operator;
+    public ImmutableArray<FabricSingleVersionRange> Values { get; } = values;
 
     public override string ToString() => $"[ {string.Join(" ", Values.Select(v => v.ToString()))} ]";
-    public bool Equals(ListedVersionRange? other)
+    public bool Equals(FabricListedVersionRange? other)
     {
         if (other is null) return false;
-        return new HashSet<SingleVersionRange>(Values).SetEquals(other.Values);
+        return new HashSet<FabricSingleVersionRange>(Values).SetEquals(other.Values);
     }
     public override int GetHashCode() => Values.GetHashCode();
-    public override bool Equals(object? obj) => obj is ListedVersionRange other && Equals(other);
+    public override bool Equals(object? obj) => obj is FabricListedVersionRange other && Equals(other);
 
     public override bool Satisfies(string version) => Operator switch
     {
-        VersionListOperator.Or => Values.Any(v => v.Satisfies(version)),
-        VersionListOperator.And => Values.All(v => v.Satisfies(version)),
+        FabricVersionListOperator.Or => Values.Any(v => v.Satisfies(version)),
+        FabricVersionListOperator.And => Values.All(v => v.Satisfies(version)),
         _ => throw new UnreachableException()
     };
 
     public override bool Satisfies(SemanticVersion version) => Operator switch
     {
-        VersionListOperator.Or => Values.Any(v => v.Satisfies(version)),
-        VersionListOperator.And => Values.All(v => v.Satisfies(version)),
+        FabricVersionListOperator.Or => Values.Any(v => v.Satisfies(version)),
+        FabricVersionListOperator.And => Values.All(v => v.Satisfies(version)),
         _ => throw new UnreachableException()
     };
 }

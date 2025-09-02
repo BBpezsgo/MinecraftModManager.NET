@@ -9,25 +9,29 @@ public static class Add
             if (Context.Instance.Modlist.Mods.Any(v => v.Id == query) &&
                 Context.Instance.ModlistLock.Any(v => v.Id == query))
             {
-                Log.Error($"Mod {query} already added");
+                Log.Error($"Mod {Context.Instance.GetModName(query)} already added");
                 continue;
             }
 
-            (string? id, string? name) = await ModrinthUtils.FindModOnline(query, ct);
+            (string Id, string Name)? v = await ModrinthUtils.FindModOnline(query, ct);
+            if (!v.HasValue) continue;
+            string id = v.Value.Id;
 
-            if (id is null) continue;
-
-            if (Context.Instance.Modlist.Mods.Any(v => v.Id == id) &&
-                Context.Instance.ModlistLock.Any(v => v.Id == id))
+            if (Context.Instance.Modlist.Mods.Any(v => v.Id == id))
             {
-                Log.Error($"Mod {name ?? query} already added");
+                Log.Error($"Mod {v.Value.Name} already added");
                 continue;
+            }
+
+            if (Context.Instance.ModlistLock.Any(v => v.Id == id))
+            {
+                Log.Info($"Mod already installed");
             }
 
             Context.Instance.Modlist.Mods.Add(new ModEntry()
             {
                 Id = id,
-                Name = name,
+                Name = v.Value.Name,
             });
         }
 
