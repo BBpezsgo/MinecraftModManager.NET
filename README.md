@@ -1,6 +1,6 @@
 # Minecraft Mod Manager
 
-[![.Net 10.0](https://img.shields.io/badge/.NET-10.0-5C2D91)](#)
+[![.Net 10.0](https://img.shields.io/badge/10.0-606060?style=flat-square&logo=dotnet&labelColor=512BD4)](#)
 
 Convinient command line mod manager for Minecraft using Modrinth.
 
