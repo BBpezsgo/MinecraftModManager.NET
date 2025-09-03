@@ -4,9 +4,6 @@
 
 Convinient command line mod manager for Minecraft using Modrinth.
 
-> [!CAUTION]
-> Only works with Fabric mods.
-
 ## Features
 
 - Install & uninstall mods
