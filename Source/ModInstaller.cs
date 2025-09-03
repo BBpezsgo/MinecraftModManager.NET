@@ -334,16 +334,18 @@ public static class ModInstaller
 
         {
             int nameMaxWidth = 0;
-            nameMaxWidth = changes.Install.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, v.Name.Length));
-            nameMaxWidth = changes.Uninstall.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, v.Name.Length));
-            nameMaxWidth += 2;
+            if (!Console.IsOutputRedirected)
+            {
+                nameMaxWidth = changes.Install.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, v.Name.Length));
+                nameMaxWidth = changes.Uninstall.Aggregate(nameMaxWidth, (a, v) => Math.Max(a, v.Name.Length));
+                nameMaxWidth += 2;
+                nameMaxWidth = Math.Clamp(nameMaxWidth, 4, Console.WindowWidth * 2 / 3);
+            }
 
             if (!changes.IsEmpty)
             {
                 Console.WriteLine();
             }
-
-            nameMaxWidth = Math.Clamp(nameMaxWidth, 4, Console.WindowWidth * 2 / 3);
 
             foreach (ModInstallInfo update in changes.Install)
             {
@@ -367,16 +369,24 @@ public static class ModInstaller
                 }
                 Console.ResetColor();
 
-                if (name.Length > nameMaxWidth)
+                if (Console.IsOutputRedirected)
                 {
-                    Console.Write(name.AsSpan(0, nameMaxWidth - 3));
-                    Console.Write("...");
+                    Console.Write(name);
+                    Console.Write(' ');
                 }
                 else
                 {
-                    Console.Write(name);
+                    if (name.Length > nameMaxWidth)
+                    {
+                        Console.Write(name.AsSpan(0, nameMaxWidth - 3));
+                        Console.Write("...");
+                    }
+                    else
+                    {
+                        Console.Write(name);
+                    }
+                    Console.Write(new string(' ', nameMaxWidth - name.Length));
                 }
-                Console.Write(new string(' ', nameMaxWidth - name.Length));
 
                 IMod? existing = update.LockEntry is null ? null : mods.FirstOrDefault(v => Path.GetFileName(v.FileName) == update.LockEntry.FileName).Mod;
 

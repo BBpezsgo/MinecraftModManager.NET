@@ -4,6 +4,8 @@ public static class Add
 {
     public static async Task PerformAdd(string[] queries, CancellationToken ct)
     {
+        bool didAddSomething = false;
+
         foreach (string query in queries)
         {
             if (Context.Instance.Modlist.Mods.Any(v => v.Id == query) &&
@@ -33,7 +35,10 @@ public static class Add
                 Id = id,
                 Name = v.Value.Name,
             });
+            didAddSomething = true;
         }
+
+        if (!didAddSomething) return;
 
         Changes changes = await ModInstaller.CheckChanges(ct);
 

@@ -28,7 +28,10 @@ public static class Program
 
     static async Task Run(string[] args, CancellationToken ct)
     {
-        if (args.Length == 0)
+        string? action = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : null;
+        if (action is not null) args = args[1..];
+
+        if (action is null && (args.Contains("-h") || args.Contains("--help") || args.Length == 0))
         {
             Help.PrintHelp(null);
             return;
@@ -42,16 +45,16 @@ public static class Program
             Actions.Install.PerformInstall();
         }
 
-        switch (args[0])
+        switch (action)
         {
             case "update":
                 if (args.ContainsAny("--help", "-h"))
                 {
-                    Help.PrintHelp(args[0]);
+                    Help.PrintHelp(action);
                     break;
                 }
 
-                if (args.Length != 1)
+                if (args.Length != 0)
                 {
                     throw new ApplicationArgumentsException($"Wrong number of arguments passed");
                 }
@@ -61,11 +64,11 @@ public static class Program
             case "check":
                 if (args.ContainsAny("--help", "-h"))
                 {
-                    Help.PrintHelp(args[0]);
+                    Help.PrintHelp(action);
                     break;
                 }
 
-                if (args.Length != 1)
+                if (args.Length != 0)
                 {
                     throw new ApplicationArgumentsException($"Wrong number of arguments passed");
                 }
@@ -75,39 +78,39 @@ public static class Program
             case "add":
                 if (args.ContainsAny("--help", "-h"))
                 {
-                    Help.PrintHelp(args[0]);
+                    Help.PrintHelp(action);
                     break;
                 }
 
-                if (args.Length < 2)
+                if (args.Length < 1)
                 {
                     throw new ApplicationArgumentsException($"Wrong number of arguments passed");
                 }
 
-                await Actions.Add.PerformAdd(args[1..], ct);
+                await Actions.Add.PerformAdd(args, ct);
                 break;
             case "remove":
                 if (args.ContainsAny("--help", "-h"))
                 {
-                    Help.PrintHelp(args[0]);
+                    Help.PrintHelp(action);
                     break;
                 }
 
-                if (args.Length < 2)
+                if (args.Length < 1)
                 {
                     throw new ApplicationArgumentsException($"Wrong number of arguments passed");
                 }
 
-                await Actions.Remove.PerformRemove(args[1..], ct);
+                await Actions.Remove.PerformRemove(args, ct);
                 break;
             case "list":
                 if (args.ContainsAny("--help", "-h"))
                 {
-                    Help.PrintHelp(args[0]);
+                    Help.PrintHelp(action);
                     break;
                 }
 
-                if (args.Length != 1)
+                if (args.Length != 0)
                 {
                     throw new ApplicationArgumentsException($"Wrong number of arguments passed");
                 }
@@ -117,25 +120,19 @@ public static class Program
             case "change":
                 if (args.ContainsAny("--help", "-h"))
                 {
-                    Help.PrintHelp(args[0]);
+                    Help.PrintHelp(action);
                     break;
                 }
 
-                if (args.Length != 2)
+                if (args.Length != 1)
                 {
                     throw new ApplicationArgumentsException($"Wrong number of arguments passed");
                 }
 
-                await Actions.Change.PerformChange(args[1], ct);
+                await Actions.Change.PerformChange(args[0], ct);
                 break;
             default:
-                if (args.ContainsAny("--help", "-h"))
-                {
-                    Help.PrintHelp(null);
-                    break;
-                }
-
-                throw new ApplicationArgumentsException($"Invalid action {args[0]}");
+                throw new ApplicationArgumentsException($"Invalid action {action}");
         }
     }
 }

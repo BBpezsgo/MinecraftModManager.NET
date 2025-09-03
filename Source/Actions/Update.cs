@@ -109,6 +109,11 @@ public static class Update
             }
         }
 
+        if (modUpdates.Count == 0)
+        {
+            Log.Info($"All mods are up to date");
+        }
+
         return new Changes()
         {
             Install = modUpdates.ToImmutable(),
