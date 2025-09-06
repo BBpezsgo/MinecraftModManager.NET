@@ -11,7 +11,20 @@ Convinient command line mod manager for Minecraft using Modrinth.
 - Dependency management
 - Conflict check
 
+## Installation
+
+1. Download the binaries from the [Releases](https://github.com/BBpezsgo/MinecraftModManager.NET/releases/latest). (or build it yourself, the script used for publishing the app can be found [here](https://github.com/BBpezsgo/MinecraftModManager.NET/blob/main/publish.sh))
+2. You can just use it as it is, no installation required.
+
+> [!NOTE]
+> For actually managing Minecraft mods, it requires a package.json that can be created by running the program with no arguments.
+
+> [!TIP]
+> Its convinient if you add the binary to the PATH environment variable so you can use it anywhere.
+
 ## Usage
+
+`mmm` - Prints the commands you can use.
 
 `mmm update` - Checks for updates and downloads the newer versions.
 
@@ -23,6 +36,10 @@ Convinient command line mod manager for Minecraft using Modrinth.
 
 `mmm change <version>` - Replaces all the mods with the specified Minecraft version. (unsupported mods will be deleted)
 
+> [!TIP]
+> You can put `-h` or `--help` after any command to read about what it does.
+
+> [!TIP]
 > You can get the Modrinth id of a mod by going to the mod's page, clicking on the three dots (top right) and clicking "Copy ID".
 
 ## Known Issues
