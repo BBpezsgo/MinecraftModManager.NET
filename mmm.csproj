@@ -17,4 +17,8 @@
     <PackageReference Include="Tomlyn" Version="0.19.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../Logger/Logger.csproj" />
+  </ItemGroup>
+
 </Project>

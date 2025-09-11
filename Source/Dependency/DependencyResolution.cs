@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Logger;
 using MMM.Fabric;
 using MMM.Forge;
 
@@ -25,7 +26,7 @@ public static class DependencyResolution
             {
                 if (mod is not FabricMod fabricMod || fabricMod.Provides.IsDefaultOrEmpty || !fabricMod.Provides.Contains(id))
                 {
-                continue;
+                    continue;
                 }
             }
 

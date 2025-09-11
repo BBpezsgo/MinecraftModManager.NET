@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Text.Json;
+using Logger;
 using MMM.Fabric;
 using MMM.Forge;
 using Tomlyn.Model;

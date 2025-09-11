@@ -1,4 +1,5 @@
 using System.Buffers;
+using Logger;
 using Modrinth.Exceptions;
 
 namespace MMM;

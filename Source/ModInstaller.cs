@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using Logger;
 using Modrinth.Exceptions;
 
 namespace MMM;

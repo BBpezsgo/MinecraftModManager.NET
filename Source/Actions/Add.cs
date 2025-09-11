@@ -1,3 +1,5 @@
+using Logger;
+
 namespace MMM.Actions;
 
 public static class Add
