@@ -234,7 +234,7 @@ public static class ModInstaller
         };
     }
 
-    static async Task<(bool NeedsDownload, ModUpdateReason Reason)> IsNeeded(ModEntry mod, CancellationToken ct)
+    public static async Task<(bool NeedsDownload, ModUpdateReason Reason)> IsNeeded(ModEntry mod, CancellationToken ct)
     {
         ModLock? lockfileEntry = Context.Instance.ModlistLock.FirstOrDefault(v => v.Id == mod.Id);
         if (lockfileEntry is null)

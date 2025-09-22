@@ -64,6 +64,30 @@ public static class Update
             if (update is null) continue;
 
             modUpdates.Add(update);
+
+            foreach (Modrinth.Models.Dependency dependency in update.Version.Dependencies ?? [])
+            {
+                if (dependency.ProjectId is null) continue;
+                if (checkThese.Any(v => v == dependency.ProjectId)) continue;
+
+                switch (dependency.DependencyType)
+                {
+                    case Modrinth.Models.Enums.Version.DependencyType.Required:
+                        ModEntry entry = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == dependency.ProjectId) ?? new ModEntry()
+                        {
+                            Id = dependency.ProjectId,
+                            Name = await ModrinthUtils.GetModName(dependency.ProjectId, ct),
+                        };
+                        checkThese.Add(entry.Id);
+                        break;
+                    case Modrinth.Models.Enums.Version.DependencyType.Optional:
+                        break;
+                    case Modrinth.Models.Enums.Version.DependencyType.Incompatible:
+                        break;
+                    case Modrinth.Models.Enums.Version.DependencyType.Embedded:
+                        break;
+                }
+            }
         }
 
         progressBar.Dispose();
