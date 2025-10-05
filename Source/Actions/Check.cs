@@ -81,15 +81,15 @@ public static class Check
         {
             if (error.Level != DependencyErrorLevel.Depends) continue;
 
-                (string Id, string Name)? v = await ModrinthUtils.FindModOnline(error.OtherId, ct);
-                if (!v.HasValue) continue;
+            (string Id, string Name)? v = await ModrinthUtils.FindModOnline(error.OtherId, ct);
+            if (!v.HasValue) continue;
 
-                Context.Instance.Modlist.Mods.Add(new ModEntry()
-                {
-                    Id = v.Value.Id,
-                    Name = v.Value.Name,
-                });
-            }
+            Context.Instance.Modlist.Mods.Add(new ModEntry()
+            {
+                Id = v.Value.Id,
+                Name = v.Value.Name,
+            });
+        }
 
         Changes changes = await ModInstaller.CheckChanges(ct);
 
