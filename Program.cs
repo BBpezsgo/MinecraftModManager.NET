@@ -17,6 +17,7 @@ public static partial class Program
         Console.CancelKeyPress += (sender, e) =>
         {
             cts.Cancel();
+            e.Cancel = true;
         };
 
         using Task task = Run(args, cts.Token);

@@ -79,8 +79,8 @@ public static class Check
 
         foreach (DependencyError error in errors)
         {
-            if (error.Level == DependencyErrorLevel.Depends)
-            {
+            if (error.Level != DependencyErrorLevel.Depends) continue;
+
                 (string Id, string Name)? v = await ModrinthUtils.FindModOnline(error.OtherId, ct);
                 if (!v.HasValue) continue;
 
@@ -90,7 +90,6 @@ public static class Check
                     Name = v.Value.Name,
                 });
             }
-        }
 
         Changes changes = await ModInstaller.CheckChanges(ct);
 

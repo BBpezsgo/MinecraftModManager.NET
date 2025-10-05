@@ -211,7 +211,7 @@ public static class ModInstaller
                         if (lockEntry is not null)
                         {
                             lockEntry.Name = name;
-                            await File.WriteAllTextAsync(Context.ModlistLockPath, JsonSerializer.Serialize(Context.Instance.ModlistLock, ModLockListJsonSerializerContext.Default.ListModLock), ct);
+                            File.WriteAllText(Context.ModlistLockPath, JsonSerializer.Serialize(Context.Instance.ModlistLock, ModLockListJsonSerializerContext.Default.ListModLock));
                         }
 
                         ModEntry? modEntry = Context.Instance.Modlist.Mods.FirstOrDefault(v => v.Id == mod);
@@ -306,7 +306,7 @@ public static class ModInstaller
             info.LockEntry.Dependencies.AddRange(dependencies);
         }
 
-        await File.WriteAllTextAsync(Context.ModlistLockPath, JsonSerializer.Serialize(Context.Instance.ModlistLock, ModLockListJsonSerializerContext.Default.ListModLock), ct);
+        File.WriteAllText(Context.ModlistLockPath, JsonSerializer.Serialize(Context.Instance.ModlistLock, ModLockListJsonSerializerContext.Default.ListModLock));
 
         oldFilename = oldFilename is null ? null : Path.GetFullPath(Path.Combine(Context.Instance.ModsDirectory, oldFilename));
 
@@ -469,7 +469,7 @@ public static class ModInstaller
         {
             if (Log.AskYesNo("Do you want to perform the actions above?", true))
             {
-                await File.WriteAllTextAsync(Context.ModlistPath, JsonSerializer.Serialize(Context.Instance.Modlist, ModListJsonSerializerContext.Default.ModList), ct);
+                File.WriteAllText(Context.ModlistPath, JsonSerializer.Serialize(Context.Instance.Modlist, ModListJsonSerializerContext.Default.ModList));
 
                 ProgressBar progressBar = new();
 
@@ -489,7 +489,7 @@ public static class ModInstaller
                     ModUninstallInfo uninstall = changes.Uninstall[i];
 
                     UninstallMod(uninstall);
-                    await File.WriteAllTextAsync(Context.ModlistLockPath, JsonSerializer.Serialize(Context.Instance.ModlistLock, ModLockListJsonSerializerContext.Default.ListModLock), ct);
+                    File.WriteAllText(Context.ModlistLockPath, JsonSerializer.Serialize(Context.Instance.ModlistLock, ModLockListJsonSerializerContext.Default.ListModLock));
                 }
             }
         }
